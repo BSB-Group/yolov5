@@ -64,21 +64,26 @@ class Loggers():
         self.plots = not opt.noplots  # plot results
         self.logger = logger  # for printing results to console
         self.include = include
+
+        # mAP range
+        iouv_start = 0.5 if "iouv_start" not in hyp else hyp["iouv_start"]
+        iouv_end = 0.95 if "iouv_end" not in hyp else hyp["iouv_end"]
+
         self.keys = [
             'train/box_loss',
             'train/obj_loss',
             'train/cls_loss',  # train loss
             'metrics/precision',
             'metrics/recall',
-            'metrics/mAP_0.5',
-            'metrics/mAP_0.5:0.95',  # metrics
+            f'metrics/mAP_{iouv_start}',
+            f'metrics/mAP_{iouv_start}:{iouv_end}',  # metrics
             'val/box_loss',
             'val/obj_loss',
             'val/cls_loss',  # val loss
             'x/lr0',
             'x/lr1',
             'x/lr2']  # params
-        self.best_keys = ['best/epoch', 'best/precision', 'best/recall', 'best/mAP_0.5', 'best/mAP_0.5:0.95']
+        self.best_keys = ['best/epoch', 'best/precision', 'best/recall', f'best/mAP_{iouv_start}', f'best/mAP_{iouv_start}:{iouv_end}']
         for k in LOGGERS:
             setattr(self, k, None)  # init empty logger dictionary
         self.csv = True  # always log to csv

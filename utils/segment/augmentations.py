@@ -12,6 +12,7 @@ import numpy as np
 from ..augmentations import box_candidates
 from ..general import resample_segments, segment2box
 
+BACKGROUND_COLOR = (0, 0, 0)  # black
 
 def mixup(im, labels, segments, im2, labels2, segments2):
     # Applies MixUp augmentation https://arxiv.org/pdf/1710.09412.pdf
@@ -69,9 +70,9 @@ def random_perspective(im,
     M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
         if perspective:
-            im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=(114, 114, 114))
+            im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=BACKGROUND_COLOR)
         else:  # affine
-            im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
+            im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=BACKGROUND_COLOR)
 
     # Visualize
     # import matplotlib.pyplot as plt

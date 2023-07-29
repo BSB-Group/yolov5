@@ -18,7 +18,7 @@ from ..torch_utils import torch_distributed_zero_first
 from .augmentations import mixup, random_perspective
 
 RANK = int(os.getenv('RANK', -1))
-
+FILL_VALUE = 0 # 114
 
 def create_dataloader(path,
                       imgsz,
@@ -218,7 +218,7 @@ class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
 
             # place img in img4
             if i == 0:  # top left
-                img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
+                img4 = np.full((s * 2, s * 2, img.shape[2]), FILL_VALUE, dtype=np.uint8)  # base image with 4 tiles
                 x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
                 x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
             elif i == 1:  # top right

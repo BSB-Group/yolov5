@@ -17,7 +17,8 @@ from utils.metrics import bbox_ioa
 
 IMAGENET_MEAN = 0.485, 0.456, 0.406  # RGB mean
 IMAGENET_STD = 0.229, 0.224, 0.225  # RGB standard deviation
-
+BACKGROUND_COLOR = (0, 0, 0)  # border color for padding
+FILL_VALUE = 0 # 114
 
 class Albumentations:
     # YOLOv5 Albumentations class (optional, only used if package is installed)
@@ -108,7 +109,7 @@ def replicate(im, labels):
     return im, labels
 
 
-def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+def letterbox(im, new_shape=(640, 640), color=BACKGROUND_COLOR, auto=True, scaleFill=False, scaleup=True, stride=32):
     # Resize and pad image while meeting stride-multiple constraints
     shape = im.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -188,9 +189,9 @@ def random_perspective(im,
     M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
         if perspective:
-            im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=(114, 114, 114))
+            im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=BACKGROUND_COLOR)
         else:  # affine
-            im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
+            im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=BACKGROUND_COLOR)
 
     # Visualize
     # import matplotlib.pyplot as plt
@@ -365,7 +366,7 @@ class LetterBox:
         h, w = round(imh * r), round(imw * r)  # resized image
         hs, ws = (math.ceil(x / self.stride) * self.stride for x in (h, w)) if self.auto else self.h, self.w
         top, left = round((hs - h) / 2 - 0.1), round((ws - w) / 2 - 0.1)
-        im_out = np.full((self.h, self.w, 3), 114, dtype=im.dtype)
+        im_out = np.full((self.h, self.w, 3), FILL_VALUE, dtype=im.dtype)
         im_out[top:top + h, left:left + w] = cv2.resize(im, (w, h), interpolation=cv2.INTER_LINEAR)
         return im_out
 

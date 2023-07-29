@@ -69,9 +69,10 @@ def save_one_json(predn, jdict, path, class_map):
             'score': round(p[4], 5)})
 
 
-def process_batch(detections, labels, iouv):
+def process_batch(detections, labels, iouv, agnostic=False):
     """
     Return correct prediction matrix
+    ** modified: agnostic option **
     Arguments:
         detections (array[N, 6]), x1, y1, x2, y2, conf, class
         labels (array[M, 5]), class, x1, y1, x2, y2
@@ -80,7 +81,7 @@ def process_batch(detections, labels, iouv):
     """
     correct = np.zeros((detections.shape[0], iouv.shape[0])).astype(bool)
     iou = box_iou(labels[:, 1:], detections[:, :4])
-    correct_class = labels[:, 0:1] == detections[:, 5]
+    correct_class = labels[:, 0:1] == detections[:, 5] if not agnostic else torch.ones_like(iou, dtype=torch.bool)
     for i in range(len(iouv)):
         x = torch.where((iou >= iouv[i]) & correct_class)  # IoU > threshold and classes match
         if x[0].shape[0]:
@@ -101,7 +102,7 @@ def run(
         batch_size=32,  # batch size
         imgsz=640,  # inference size (pixels)
         conf_thres=0.001,  # confidence threshold
-        iou_thres=0.6,  # NMS IoU threshold
+        iou_thres=0.1,  # NMS IoU threshold
         max_det=300,  # maximum detections per image
         task='val',  # train, val, test, speed or study
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -125,6 +126,11 @@ def run(
         callbacks=Callbacks(),
         compute_loss=None,
 ):
+    if model is not None:
+        hyp = model.hyp  # hyperparameters
+    else:
+        hyp = False
+
     # Initialize/load model and set device
     training = model is not None
     if training:  # called by train.py
@@ -159,7 +165,9 @@ def run(
     cuda = device.type != 'cpu'
     is_coco = isinstance(data.get('val'), str) and data['val'].endswith(f'coco{os.sep}val2017.txt')  # COCO dataset
     nc = 1 if single_cls else int(data['nc'])  # number of classes
-    iouv = torch.linspace(0.5, 0.95, 10, device=device)  # iou vector for mAP@0.5:0.95
+    iouv_start = 0.5 if (not hyp or 'iouv_start' not in hyp) else hyp['iouv_start']
+    iouv_end = 0.95 if (not hyp or 'iouv_end' not in hyp) else hyp['iouv_end']
+    iouv = torch.linspace(iouv_start, iouv_end, 10, device=device)  # iou vector for mAP@iouv_start:iouv_end
     niou = iouv.numel()
 
     # Dataloader
@@ -218,10 +226,10 @@ def run(
         with dt[2]:
             preds = non_max_suppression(preds,
                                         conf_thres,
-                                        iou_thres,
+                                        iou_thres if (not hyp or 'nms_iou_t' not in hyp) else hyp['nms_iou_t'],
                                         labels=lb,
                                         multi_label=True,
-                                        agnostic=single_cls,
+                                        agnostic=single_cls if (not hyp or 'nms_agnostic' not in hyp) else hyp['nms_agnostic'],
                                         max_det=max_det)
 
         # Metrics
@@ -260,10 +268,15 @@ def run(
                 save_one_txt(predn, save_conf, shape, file=save_dir / 'labels' / f'{path.stem}.txt')
             if save_json:
                 save_one_json(predn, jdict, path, class_map)  # append to COCO-JSON dictionary
+        
+        if batch_i in np.linspace(0, len(dataloader) - 1, 16).astype(int):
+            # Plot images with bounding boxes, 16 by default, 1 per batch
+            # evenly spaced accorss the dataset batch size
             callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
 
         # Plot images
-        if plots and batch_i < 3:
+        # if plots and batch_i < 3:
+        if plots and batch_i in np.linspace(0, len(dataloader) - 2, 3).astype(int):
             plot_images(im, targets, paths, save_dir / f'val_batch{batch_i}_labels.jpg', names)  # labels
             plot_images(im, output_to_target(preds), paths, save_dir / f'val_batch{batch_i}_pred.jpg', names)  # pred
 
