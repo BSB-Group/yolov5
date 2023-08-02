@@ -6,6 +6,9 @@ from albumentations.core.transforms_interface import ImageOnlyTransform, to_tupl
 
 
 def convert_16bit_to_8bit(im, augment=True):
+    if not len(im.shape) == 2:
+        # for some reason, some 16bit images have 3 channels
+        im = im[:, :, 0]
     transform = get_16_to_8_transform(augment)
     return transform(image=im)['image']
 
@@ -14,8 +17,8 @@ def get_16_to_8_transform(augment):
     if augment:
         # meant to be used for training, randomness is important
         return A.Compose([
-            CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(-1, -1)),
             Clip(p=1.0, max_span=(0.15, 0.25)),
+            CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(-1, -1)),
             NormalizeMinMax(p=1.0),
             A.ToRGB(p=1.0),
         ])

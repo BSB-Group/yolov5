@@ -734,8 +734,12 @@ class LoadImagesAndLabels(Dataset):
                 # im = cv2.imread(f)  # BGR
                 im = cv2.imread(f, cv2.IMREAD_UNCHANGED)
                 if im.dtype == np.uint16:
-                    from utils.augmentations16 import convert_16bit_to_8bit
-                    im = convert_16bit_to_8bit(im, augment=self.augment)
+                    try:
+                        from utils.augmentations16 import convert_16bit_to_8bit
+                        im = convert_16bit_to_8bit(im, augment=self.augment)
+                    except Exception as e:
+                        print(f'WARNING: Failed to convert image {f} from 16-bit to 8-bit')
+                        raise e
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
             r = self.img_size / max(h0, w0)  # ratio
