@@ -1,3 +1,4 @@
+from typing import Sequence, Union
 import random
 import numpy as np
 import cv2
@@ -17,15 +18,19 @@ def get_16_to_8_transform(augment):
     if augment:
         # meant to be used for training, randomness is important
         return A.Compose([
-            Clip(p=1.0, max_span=(0.15, 0.25)),
+            # 15000/65535 = 0.228, 28000/65535 = 0.427
+            Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
             CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(-1, -1)),
             NormalizeMinMax(p=1.0),
+            A.UnsharpMask(p=0.5, threshold=5),
             A.ToRGB(p=1.0),
         ])
     else:
+        llimit = 15000/65535
+        ulimit = 28000/65535
         # meant to be used for validation, deterministic
         return A.Compose([
-            Clip(p=1.0, max_span=(0.2, 0.2)),
+            Clip(p=1.0, lower_limit=(llimit, llimit), upper_limit=(ulimit, ulimit)),
             NormalizeMinMax(p=1.0),
             A.ToRGB(p=1.0),
         ])
@@ -48,7 +53,11 @@ class CLAHE(ImageOnlyTransform):
         uint8, uint16
     """
 
-    def __init__(self, clip_limit=4.0, tile_grid_size=(8, 8), always_apply=False, p=0.5):
+    def __init__(self, 
+                 clip_limit: Union[float, Sequence[float]]=4.0, 
+                 tile_grid_size: Union[float, Sequence[float]]=(8, 8), 
+                 always_apply=False, 
+                 p=0.5):
         super(CLAHE, self).__init__(always_apply, p)
         self.clip_limit = to_tuple(clip_limit, 1)
         self.tile_grid_size = tuple(tile_grid_size)
@@ -90,9 +99,10 @@ class Clip(ImageOnlyTransform):
     """Clip image to a certain range.
 
     Args:
-        max_contrast (float or (float, float)): upper threshold value for contrast limiting.
-            If clip_limit is a single float value, the range will be (max_contrast, 1). 
-            Default: (0.8, 1).
+        lower_limit (float or (float, float)): lower limit value for clipping.
+            If lower_limit is a single float value, the range will be (0, lower_limit). Default: (0.1, 0.2).
+        upper_limit (float or (float, float)): upper limit value for clipping.
+            If upper_limit is a single float value, the range will be (upper_limit, 1). Default: (0.8, 0.9).
 
     Targets:
         image
@@ -101,15 +111,21 @@ class Clip(ImageOnlyTransform):
         uint8, uint16
     """
 
-    def __init__(self, max_span=0.8, always_apply=False, p=0.5):
+    def __init__(self, 
+                 lower_limit: Union[float, Sequence[float]] = (0.1, 0.2),
+                 upper_limit: Union[float, Sequence[float]] = (0.8, 0.9),
+                 always_apply=False, 
+                 p=0.5):
         super(Clip, self).__init__(always_apply, p)
-        self.max_span = to_tuple(max_span, 1)
+        self.lower_limit = to_tuple(lower_limit, 0)
+        self.upper_limit = to_tuple(upper_limit, 1)
 
-    def apply(self, img, max_span=0.8, **params):
-        span = int(max_span * np.iinfo(img.dtype).max)
-        img_min = np.min(img)
-        img_max = min(np.max(img), img_min + span)
-        return np.clip(img, img_min, img_max)
+    def apply(self, img, lower_limit=0.1, upper_limit=0.9, **params):
+        max_val = np.iinfo(img.dtype).max
+        a_min = int(lower_limit * max_val)
+        a_max = int(upper_limit * max_val)
+        return np.clip(img, a_min, a_max)
 
     def get_params(self):
-        return {"max_span": random.uniform(self.max_span[0], self.max_span[1])}
+        return {"lower_limit": random.uniform(self.lower_limit[0], self.lower_limit[1]),
+                "upper_limit": random.uniform(self.upper_limit[0], self.upper_limit[1])}
