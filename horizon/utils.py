@@ -1,7 +1,7 @@
 import numpy as np
 
-def points_to_normal(x_1, y_1, x_2, y_2):
-    """Convert two points to normal form of line: rho, theta."""
+def points_to_hough(x_1, y_1, x_2, y_2):
+    """Convert two points to hough form of line: rho, theta."""
     if x_1 == x_2:  # vertical line
         return x_1, 0
     m = (y_2 - y_1) / (x_2 - x_1)
@@ -20,15 +20,15 @@ def points_to_slope_intercept(x_1, y_1, x_2, y_2):
     return m, b
 
 
-def normal_to_points(rho, theta, h=1, w=1):
+def hough_to_points(rho, theta, h=1, w=1):
     """
-    Convert normal form of line to two points.
+    Convert hough form of line to two points.
     Points are located on the image border.
     Points are normalised unless h and w are provided.
 
-    normal from --> slope-intercept form --> points.
+    hough form --> slope-intercept form --> points.
     """
-    m, b = normal_to_slope_intercept(rho, theta, h, w)
+    m, b = hough_to_slope_intercept(rho, theta, h, w)
     if m == np.inf:
         x_1, y_1 = b, 0
         x_2, y_2 = b, h
@@ -38,8 +38,8 @@ def normal_to_points(rho, theta, h=1, w=1):
     return (x_1, y_1), (x_2, y_2)
 
 
-def normal_to_slope_intercept(rho, theta, h=1, w=1):
-    """Convert normal form of line to slope-intercept form."""
+def hough_to_slope_intercept(rho, theta, h=1, w=1):
+    """Convert hough form of line to slope-intercept form."""
     if theta == 0:
         return np.inf, rho * w
     if theta == np.pi / 2:
