@@ -1,3 +1,4 @@
+import numpy as np
 import fiftyone as fo
 from torch.utils.data import Dataset
 from PIL import Image
@@ -53,7 +54,9 @@ class HorizonDataset(FiftyOneBaseDataset):
         sample = super().__getitem__(idx)
         fpath = sample["filepath"]
 
-        image = Image.open(fpath) # PIL image
+        image = Image.open(fpath).convert('RGB') # PIL image (LetterBox augmentation in transform expects 3-channel image)
+        image = np.array(image)
+
         target = sample["ground_truth_pl"]["polylines"][0]["points"][0] # list
 
         if self.transforms:
