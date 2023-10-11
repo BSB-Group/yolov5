@@ -732,14 +732,7 @@ class LoadImagesAndLabels(Dataset):
                 im = np.load(fn)
             else:  # read image
                 # im = cv2.imread(f)  # BGR
-                im = cv2.imread(f, cv2.IMREAD_UNCHANGED)
-                if im.dtype == np.uint16:
-                    try:
-                        from utils.augmentations16 import convert_16bit_to_8bit
-                        im = convert_16bit_to_8bit(im, augment=self.augment)
-                    except Exception as e:
-                        print(f'WARNING: Failed to convert image {f} from 16-bit to 8-bit')
-                        raise e
+                im = imread_16bit_compatible(f, augment16=self.augment)  # BGR
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
             r = self.img_size / max(h0, w0)  # ratio
@@ -925,6 +918,23 @@ class LoadImagesAndLabels(Dataset):
 
 
 # Ancillary functions --------------------------------------------------------------------------------------------------
+def imread_16bit_compatible(f, augment16=False):
+    # Read image with OpenCV, convert from 16-bit to 8-bit if necessary
+    im = cv2.imread(f, cv2.IMREAD_UNCHANGED)
+    if im.dtype == np.uint8:
+        if im.ndim == 2 or im.shape[2] == 1:
+            im = cv2.cvtColor(im, cv2.COLOR_GRAY2RGB) # RGB
+        else:
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB) # RGB
+    if im.dtype == np.uint16:
+        try:
+            from utils.augmentations16 import convert_16bit_to_8bit
+            im = convert_16bit_to_8bit(im, augment=augment16) # RGB
+        except Exception as e:
+            print(f'WARNING: Failed to convert image {f} from 16-bit to 8-bit')
+            raise e
+    return im
+
 def flatten_recursive(path=DATASETS_DIR / 'coco128'):
     # Flatten a recursive directory by bringing all files to top level
     new_path = Path(f'{str(path)}_flat')

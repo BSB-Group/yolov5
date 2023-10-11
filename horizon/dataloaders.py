@@ -1,7 +1,11 @@
 import numpy as np
 import fiftyone as fo
+import cv2
 from torch.utils.data import Dataset
-from PIL import Image
+import albumentations as A
+from utils.dataloaders import imread_16bit_compatible
+from horizon.utils import points_to_pitch_theta, points_to_hough
+
 
 class FiftyOneBaseDataset(Dataset):
     """
@@ -44,22 +48,73 @@ class HorizonDataset(FiftyOneBaseDataset):
     """Dataset for horizon detection training.
     """
 
-    def __init__(self, dataset: fo.Dataset,
-                 transforms: callable = None
+    def __init__(self,
+                 dataset: fo.Dataset,
+                 transform: A.Compose = None,
+                 target_format: str = "points"
                  ):
+        """
+        Args:
+            dataset (fo.Dataset): FiftyOne dataset
+            transform (A.Compose): albumentations transform
+            target_format (str): possible values: "points", "hough", "pitch_theta"
+
+        Returns:
+            image (np.ndarray): HxWxC
+            target (np.ndarray): depends on target_format
+        """
         super().__init__(dataset)
-        self.transforms = transforms
+
+        if transform is not None:
+            assert isinstance(transform, A.Compose)
+        self.transform = transform
+
+        assert target_format in ["points", "hough", "pitch_theta"]
+        self.target_format = target_format
 
     def __getitem__(self, idx):
         sample = super().__getitem__(idx)
         fpath = sample["filepath"]
 
-        image = Image.open(fpath).convert('RGB') # PIL image (LetterBox augmentation in transform expects 3-channel image)
-        image = np.array(image)
+        # read image (np.ndarray)
+        image = imread_16bit_compatible(fpath)
 
-        target = sample["ground_truth_pl"]["polylines"][0]["points"][0] # list
+        # read points (list of x,y)
+        target = sample["ground_truth_pl"]["polylines"][0]["points"][0]
+        target = np.array(target).reshape(-1, 2)
+        target[:, 0] *= image.shape[1]
+        target[:, 1] *= image.shape[0]
 
-        if self.transforms:
-            image, target = self.transforms(image, target)
+        if self.transform:
+            # albumentations does not like points in the border
+            target = self.shift_points_in_border(target, image.shape[1], image.shape[0])
+            augmented = self.transform(image=image, keypoints=target)
+            image = augmented["image"]
+            target = augmented["keypoints"]
+
+        if self.target_format == "points":
+            target = np.array(target).flatten()  # x1, y1, x2, y2
+
+        elif self.target_format == "pitch_theta":
+            # normalize points
+            target = np.array(target)
+            target[:, 0] /= image.shape[1]
+            target[:, 1] /= image.shape[0]
+
+            # convert to pitch, theta
+            x1, y1, x2, y2 = target.flatten()
+            pitch, theta = points_to_pitch_theta(x1, y1, x2, y2)
+            target = np.array([pitch, theta])
+
+        elif self.target_format == "hough":
+            x1, y1, x2, y2 = np.array(target).flatten()
+            rho, theta = points_to_hough(x1, y1, x2, y2)
+            target = np.array([rho, theta])
 
         return image, target
+
+    def shift_points_in_border(self, points, img_w, img_h):
+        """Shift points in the border to avoid albumentations errors."""
+        points[:, 0] = np.clip(points[:, 0], 1, img_w - 1)
+        points[:, 1] = np.clip(points[:, 1], 1, img_h - 1)
+        return points

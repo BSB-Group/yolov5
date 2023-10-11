@@ -1,6 +1,9 @@
+import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
-def pitch_and_theta_from_points(x1: float, y1: float, x2: float, y2: float):
+
+def points_to_pitch_theta(x1: float, y1: float, x2: float, y2: float):
     """Parameterize line that is spanned by the two points (x1, y1) and (x2, y2) through pitch and theta
        pitch ... y-value of line where x=0.5 (pitch=0 is at the bottom, pitch=1 is at the top)
        theta ... angle between line and y=0.5 (aka horizontal line)
@@ -14,11 +17,11 @@ def pitch_and_theta_from_points(x1: float, y1: float, x2: float, y2: float):
         y1 (float): y-coordinate of point 1
         x2 (float): x-coordinate of point 2
         y2 (float): y-coordinate of point 1
-    
+
     Returns:
         pitch (float): in [0,1]
         theta (float): in radians normalized to [0, 1]
-    """ 
+    """
     assert x1 != x2, "Line is not allowed to be perfectly vertical or pitch would be infinite"
 
     if (x1 > x2):
@@ -28,15 +31,16 @@ def pitch_and_theta_from_points(x1: float, y1: float, x2: float, y2: float):
         x1 = tmp_x
         y1 = tmp_y
 
-    y1 = 1-y1
-    y2 = 1-y2
-    
+    y1 = 1 - y1
+    y2 = 1 - y2
+
     m, b = points_to_slope_intercept(x1, y1, x2, y2)
-    pitch = m*0.5+b
-    theta = np.arctan(m) # rad [-pi/2, pi/2]
-    theta = (theta + 0.5*np.pi)/np.pi # [0, 1]
-    
+    pitch = m * 0.5 + b
+    theta = np.arctan(m)  # rad [-pi/2, pi/2]
+    theta = (theta + 0.5 * np.pi) / np.pi  # [0, 1]
+
     return pitch, theta
+
 
 def points_to_hough(x_1, y_1, x_2, y_2):
     """Convert two points to hough form of line: rho, theta."""
@@ -89,3 +93,14 @@ def hough_to_slope_intercept(rho, theta, h=1, w=1):
     m *= h / w
     b = -b * h
     return m, b
+
+
+def vis_keypoints(image, keypoints, color=(0, 255, 0), diameter=15):
+    image = image.copy()
+
+    for (x, y) in keypoints:
+        cv2.circle(image, (int(x), int(y)), diameter, (0, 255, 0), -1)
+
+    plt.figure(figsize=(8, 8))
+    plt.axis('off')
+    plt.imshow(image)
