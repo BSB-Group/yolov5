@@ -1,8 +1,7 @@
 import numpy as np
 import fiftyone as fo
-import cv2
-from torch.utils.data import Dataset
 import albumentations as A
+from torch.utils.data import Dataset
 from utils.dataloaders import imread_16bit_compatible
 from horizon.utils import points_to_pitch_theta, points_to_hough
 
@@ -51,7 +50,8 @@ class HorizonDataset(FiftyOneBaseDataset):
     def __init__(self,
                  dataset: fo.Dataset,
                  transform: A.Compose = None,
-                 target_format: str = "points"
+                 target_format: str = "points",
+                 augment16bit: bool = False,
                  ):
         """
         Args:
@@ -72,24 +72,29 @@ class HorizonDataset(FiftyOneBaseDataset):
         assert target_format in ["points", "hough", "pitch_theta"]
         self.target_format = target_format
 
+        assert isinstance(augment16bit, bool)
+        self.augment16bit = augment16bit
+
     def __getitem__(self, idx):
         sample = super().__getitem__(idx)
         fpath = sample["filepath"]
 
         # read image (np.ndarray)
-        image = imread_16bit_compatible(fpath)
+        image = imread_16bit_compatible(fpath, augment16=self.augment16bit)
+        image_h, image_w = image.shape[:2] # numpy has (H,W,C)
 
         # read points (list of x,y)
         target = sample["ground_truth_pl"]["polylines"][0]["points"][0]
         target = np.array(target).reshape(-1, 2)
-        target[:, 0] *= image.shape[1]
-        target[:, 1] *= image.shape[0]
+        target[:, 0] *= image_w
+        target[:, 1] *= image_h
 
         if self.transform:
             # albumentations does not like points in the border
             target = self.shift_points_in_border(target, image.shape[1], image.shape[0])
             augmented = self.transform(image=image, keypoints=target)
             image = augmented["image"]
+            image_h, image_w = image.shape[1:] # tensor has now (C,H,W)
             target = augmented["keypoints"]
 
         if self.target_format == "points":
@@ -98,8 +103,8 @@ class HorizonDataset(FiftyOneBaseDataset):
         elif self.target_format == "pitch_theta":
             # normalize points
             target = np.array(target)
-            target[:, 0] /= image.shape[1]
-            target[:, 1] /= image.shape[0]
+            target[:, 0] /= image_w
+            target[:, 1] /= image_h
 
             # convert to pitch, theta
             x1, y1, x2, y2 = target.flatten()
@@ -114,7 +119,7 @@ class HorizonDataset(FiftyOneBaseDataset):
         return image, target
 
     def shift_points_in_border(self, points, img_w, img_h):
-        """Shift points in the border to avoid albumentations errors."""
+        """If points are in the border, shift them inside the image by 1 pixel."""
         points[:, 0] = np.clip(points[:, 0], 1, img_w - 1)
         points[:, 1] = np.clip(points[:, 1], 1, img_h - 1)
         return points
