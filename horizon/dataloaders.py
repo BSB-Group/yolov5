@@ -1,6 +1,5 @@
 import numpy as np
 import fiftyone as fo
-import albumentations as A
 from torch.utils.data import Dataset
 from utils.dataloaders import imread_16bit_compatible
 from horizon.utils import points_to_pitch_theta, points_to_hough
@@ -49,7 +48,7 @@ class HorizonDataset(FiftyOneBaseDataset):
 
     def __init__(self,
                  dataset: fo.Dataset,
-                 transform: A.Compose = None,
+                 transform: callable = None,
                  target_format: str = "points",
                  augment16bit: bool = False,
                  ):
@@ -66,7 +65,7 @@ class HorizonDataset(FiftyOneBaseDataset):
         super().__init__(dataset)
 
         if transform is not None:
-            assert isinstance(transform, A.Compose)
+            assert callable(transform), "transform must be callable"
         self.transform = transform
 
         assert target_format in ["points", "hough", "pitch_theta"]
