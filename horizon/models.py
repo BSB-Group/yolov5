@@ -44,28 +44,29 @@ class HorizonModel(BaseModel):
 
         if Path(weights).is_file() or weights.endswith('.pt'):
             model = attempt_load(weights, device='cpu', fuse=False)
+            LOGGER.info(f"Loaded weights from {weights}")
         else:
             raise ValueError("model must be a path to a .pt file")
 
         if isinstance(model, DetectionModel):
             LOGGER.warning("WARNING ⚠️ converting YOLOv5 DetectionModel to HorizonModel")
-            self._from_detection_model(model, cutoff)  # inplace modification
+            self.cutoff = _find_cutoff(model) if cutoff is None else cutoff
+            self._from_detection_model(model, self.cutoff)  # inplace modification
 
         self.model = model.model
         self.model.to(self.device)
         self.model.half() if fp16 else self.model.float()
         self.save = model.save
 
-    def _from_detection_model(self, model: DetectionModel, cutoff=None):
+    def _from_detection_model(self, model: DetectionModel, cutoff: int):
         if isinstance(model, DetectMultiBackend):
             model = model.model  # unwrap DetectMultiBackend
 
-        cutoff = _find_cutoff(model) if cutoff is None else cutoff
         c_pitch, c_theta = _get_classification_heads(model, cutoff, self.nc_pitch, self.nc_theta)
         model.save = set(list(model.save + [cutoff]))  # add cutoff to save
 
         # remove layers after cutoff
-        model.model = model.model[:cutoff + 1]
+        model.model = model.model[:self.cutoff + 1]
 
         # add classification heads to model
         model.model.add_module(c_pitch.i, c_pitch)
@@ -104,6 +105,7 @@ class MultiTaskModel(BaseModel):
                  task: str = "both"  # "detection", "horizon", "both"
                  ):
         """
+        NOTE: Not tested!!!
         Multi-task model with object detection and horizon detection.
         backbone --> neck --> detection heads
                  └-> classification heads for pitch and theta
@@ -135,23 +137,26 @@ class MultiTaskModel(BaseModel):
 
         if Path(weights).is_file() or weights.endswith('.pt'):
             model = attempt_load(weights, device='cpu', fuse=False)
+            LOGGER.info(f"Loaded weights from {weights}")
         else:
             raise ValueError("model must be a path to a .pt file")
 
         if isinstance(model, DetectionModel):
             LOGGER.warning("WARNING ⚠️ converting YOLOv5 DetectionModel to HorizonModel")
-            self._add_classification_heads(model, cutoff)  # inplace modification
+            self.cutoff = _find_cutoff(model) if cutoff is None else cutoff
+            self._add_classification_heads(model, self.cutoff)  # inplace modification
 
         self.model = model.model
         self.model.to(self.device)
         self.model.half() if fp16 else self.model.float()
         self.save = model.save
+        self.stride = model.stride
+        self.nc = model.nc
 
-    def _add_classification_heads(self, model: DetectionModel, cutoff=None):
+    def _add_classification_heads(self, model: DetectionModel, cutoff: int):
         if isinstance(model, DetectMultiBackend):
             model = model.model  # unwrap DetectMultiBackend
 
-        cutoff = _find_cutoff(model) if cutoff is None else cutoff
         c_pitch, c_theta = _get_classification_heads(model, cutoff, self.nc_pitch, self.nc_theta)
         model.save = set(list(model.save + [cutoff]))  # add cutoff to save
 

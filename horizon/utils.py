@@ -1,6 +1,19 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+import torch
+
+
+def postprocess_x_pitch_theta(x_pitch, x_theta):
+    """
+    TODO: refactor postprocessing
+    """
+    # get maximum pitch and theta and normalise
+    x_pitch, x_theta = x_pitch.softmax(1), x_theta.softmax(1)
+    conf_pitch, pitch = x_pitch.max(1, keepdim=True)
+    pitch = pitch / x_pitch.shape[-1]
+    conf_theta, theta = x_theta.max(1, keepdim=True)
+    theta = theta / x_theta.shape[-1]
+    return torch.cat((pitch, conf_pitch), 1), torch.cat((theta, conf_theta), 1)
 
 
 def points_to_pitch_theta(x1: float, y1: float, x2: float, y2: float):
@@ -39,9 +52,8 @@ def points_to_pitch_theta(x1: float, y1: float, x2: float, y2: float):
     theta = np.arctan(m)  # rad [-pi/2, pi/2]
 
     # "encode" to [0, 1]
-    pitch = 0.7 * pitch + 0.15 # [0.15, 0.85] is inside the image
+    pitch = 0.7 * pitch + 0.15  # [0.15, 0.85] is inside the image
     theta = (theta + 0.5 * np.pi) / np.pi  # [0, 1]
-
 
     return pitch, theta
 
@@ -59,7 +71,7 @@ def pitch_theta_to_slope_intercept(pitch: float, theta: float):
     """
 
     # "decode" from [0, 1]
-    pitch = (pitch - 0.15) / 0.7 # [0, 1]
+    pitch = (pitch - 0.15) / 0.7  # [0, 1]
     theta = theta * np.pi - 0.5 * np.pi  # rad [-pi/2, pi/2]
 
     m = np.tan(theta)
@@ -80,7 +92,7 @@ def pitch_theta_to_points(pitch: float, theta: float, w: int = 1, h: int = 1):
     """
     m, b = pitch_theta_to_slope_intercept(pitch, theta)
     (x1, y1), (x2, y2) = slope_intercept_to_points(m, b, w, h)
-    y1, y2 = h - y1, h - y2 # invert y-axis since origin is top left corner
+    y1, y2 = h - y1, h - y2  # invert y-axis since origin is top left corner
     return (x1, y1), (x2, y2)
 
 
@@ -159,7 +171,7 @@ def draw_horizon(image,
     if keypoints is not None:
         x1, y1, x2, y2 = np.array(keypoints).flatten()
         for (x, y) in keypoints:
-            cv2.circle(image, (int(x), int(y)), diameter*5, (0, 255, 0), -1)
+            cv2.circle(image, (int(x), int(y)), diameter * 5, (0, 255, 0), -1)
 
     if pitch_theta is not None:
         (x1, y1), (x2, y2) = pitch_theta_to_points(*pitch_theta, image.shape[1], image.shape[0])

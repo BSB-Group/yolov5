@@ -1,8 +1,105 @@
+"""
+SEA.AI
+authors: Kevin Serrano,
+
+This file contains the dataset classes used for training 
+YOLOv5 horizon detection model (RGB and IR16bit).
+"""
+
 import numpy as np
 import fiftyone as fo
-from torch.utils.data import Dataset
-from utils.dataloaders import imread_16bit_compatible
-from horizon.utils import points_to_pitch_theta, points_to_hough
+import cv2
+
+from torch.utils.data import Dataset, DataLoader
+import horizon.transforms as T
+
+
+def get_train_rgb_dataloader(dataset: fo.Dataset,
+                             imgsz: int,
+                             batch_size: int = 16,
+                             num_workers: int = 4,
+                             shuffle: bool = True,
+                             pin_memory: bool = False,
+                             dataloader_kwargs: dict = {},
+                             ):
+    dataset = HorizonDataset(
+        dataset=dataset,
+        transform=T.horizon_augment_RGB(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+    )
+    return DataLoader(dataset,
+                      batch_size=batch_size,
+                      num_workers=num_workers,
+                      shuffle=shuffle,
+                      pin_memory=pin_memory,
+                      **dataloader_kwargs,
+                      )
+
+
+def get_val_rgb_dataloader(dataset: fo.Dataset,
+                           imgsz: int,
+                           batch_size: int = 16,
+                           num_workers: int = 4,
+                           shuffle: bool = False,
+                           pin_memory: bool = False,
+                           dataloader_kwargs: dict = {},
+                           ):
+    dataset = HorizonDataset(
+        dataset=dataset,
+        transform=T.horizon_base_RGB(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+    )
+    return DataLoader(dataset,
+                      batch_size=batch_size,
+                      num_workers=num_workers,
+                      shuffle=shuffle,
+                      pin_memory=pin_memory,
+                      **dataloader_kwargs,
+                      )
+
+
+def get_train_IR16bit_dataseloader(dataset: fo.Dataset,
+                               imgsz: int,
+                               batch_size: int = 64,
+                               num_workers: int = 4,
+                               shuffle: bool = True,
+                               pin_memory: bool = False,
+                               dataloader_kwargs: dict = {},
+                               ):
+    dataset = HorizonDataset(
+        dataset=dataset,
+        transform=T.horizon_augment_IR16bit(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+    )
+    return DataLoader(dataset,
+                      batch_size=batch_size,
+                      num_workers=num_workers,
+                      shuffle=shuffle,
+                      pin_memory=pin_memory,
+                      **dataloader_kwargs,
+                      )
+
+
+def get_val_IR16bit_dataloader(dataset: fo.Dataset,
+                           imgsz: int,
+                           batch_size: int = 64,
+                           num_workers: int = 4,
+                           shuffle: bool = False,
+                           pin_memory: bool = False,
+                           dataloader_kwargs: dict = {},
+                           ):
+    dataset = HorizonDataset(
+        dataset=dataset,
+        transform=T.horizon_base_IR16bit(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+    )
+    return DataLoader(dataset,
+                      batch_size=batch_size,
+                      num_workers=num_workers,
+                      shuffle=shuffle,
+                      pin_memory=pin_memory,
+                      **dataloader_kwargs,
+                      )
 
 
 class FiftyOneBaseDataset(Dataset):
@@ -49,18 +146,19 @@ class HorizonDataset(FiftyOneBaseDataset):
     def __init__(self,
                  dataset: fo.Dataset,
                  transform: callable = None,
-                 target_format: str = "points",
-                 augment16bit: bool = False,
+                 target_transform: callable = None,
                  ):
         """
         Args:
             dataset (fo.Dataset): FiftyOne dataset
-            transform (A.Compose): albumentations transform
-            target_format (str): possible values: "points", "hough", "pitch_theta"
+            transform (callable): transform to apply to image and target.
+                Example usage: `transform(image=image, keypoints=target)`
+            target_transform (callable): transform to apply to target
+                Example usage: `target_transform(target, image_w, image_h)`
 
         Returns:
             image (np.ndarray): HxWxC
-            target (np.ndarray): depends on target_format
+            target (np.ndarray): depends on target_transform
         """
         super().__init__(dataset)
 
@@ -68,19 +166,19 @@ class HorizonDataset(FiftyOneBaseDataset):
             assert callable(transform), "transform must be callable"
         self.transform = transform
 
-        assert target_format in ["points", "hough", "pitch_theta"]
-        self.target_format = target_format
-
-        assert isinstance(augment16bit, bool)
-        self.augment16bit = augment16bit
+        if target_transform is not None:
+            assert callable(target_transform), "target_transform must be callable"
+        self.target_transform = target_transform
 
     def __getitem__(self, idx):
         sample = super().__getitem__(idx)
         fpath = sample["filepath"]
 
         # read image (np.ndarray)
-        image = imread_16bit_compatible(fpath, augment16=self.augment16bit)
-        image_h, image_w = image.shape[:2] # numpy has (H,W,C)
+        image = cv2.imread(fpath, cv2.IMREAD_UNCHANGED)
+        if image.ndim > 2 and image.shape[2] == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image_h, image_w = image.shape[:2]  # numpy has (H,W,C)
 
         # read points (list of x,y)
         target = sample["ground_truth_pl"]["polylines"][0]["points"][0]
@@ -93,27 +191,11 @@ class HorizonDataset(FiftyOneBaseDataset):
             target = self.shift_points_in_border(target, image.shape[1], image.shape[0])
             augmented = self.transform(image=image, keypoints=target)
             image = augmented["image"]
-            image_h, image_w = image.shape[1:] # tensor has now (C,H,W)
+            image_h, image_w = image.shape[1:]  # tensor has now (C,H,W)
             target = augmented["keypoints"]
 
-        if self.target_format == "points":
-            target = np.array(target).flatten()  # x1, y1, x2, y2
-
-        elif self.target_format == "pitch_theta":
-            # normalize points
-            target = np.array(target)
-            target[:, 0] /= image_w
-            target[:, 1] /= image_h
-
-            # convert to pitch, theta
-            x1, y1, x2, y2 = target.flatten()
-            pitch, theta = points_to_pitch_theta(x1, y1, x2, y2)
-            target = np.array([pitch, theta])
-
-        elif self.target_format == "hough":
-            x1, y1, x2, y2 = np.array(target).flatten()
-            rho, theta = points_to_hough(x1, y1, x2, y2)
-            target = np.array([rho, theta])
+        if self.target_transform:
+            target = self.target_transform(target, image_w, image_h)
 
         return image, target
 
