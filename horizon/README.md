@@ -12,6 +12,8 @@
   - [ ] Interpret output of classification heads as a distribution and take mean and std as value and confidence?
   - [ ] Same as before but with "peak suppression" (describe this scenario in more detail with example pictures)
 - [ ] Refactor code (/horizon/augment.py, /horizon/train.py)
+- [ ] Implement `EnsembleModel` (horizon + bboxes)
+- [ ] Implement "horizon-check" for datasets (check for outliers in theta and pitch)
 - [ ] Implement logger (compatible with `wandb`)
 - [ ] Export `EnsembleModel` to TensorRT
 - [ ] Speed benchmarks for `EnsembleModel`
