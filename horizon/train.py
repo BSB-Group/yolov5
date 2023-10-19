@@ -9,6 +9,9 @@ from copy import deepcopy
 import fiftyone as fo
 from fiftyone import ViewField as F
 
+import pandas as pd
+import plotly.express as px
+
 import torch
 from torch.nn import CrossEntropyLoss, Dropout
 from torch.cuda import amp
@@ -29,18 +32,19 @@ from horizon.dataloaders import (get_train_rgb_dataloader,
                                  get_train_IR16bit_dataseloader,
                                  get_val_IR16bit_dataloader)
 
-def run(dataset_name: str, # fiftyone dataset name
-        train_tag: str = 'train', # fiftyone dataset tag
-        val_tag: str = 'val', # fiftyone dataset tag
-        weights: str = 'yolov5n.pt', # initial weights path
-        nc_pitch: int = 500, # number of pitch classes
-        nc_theta: int = 500, # number of theta classes
-        imgsz: int = 640, # model input size (assumes squared input)
+
+def run(dataset_name: str,  # fiftyone dataset name
+        train_tag: str = 'train',  # fiftyone dataset tag
+        val_tag: str = 'val',  # fiftyone dataset tag
+        weights: str = 'yolov5n.pt',  # initial weights path
+        nc_pitch: int = 500,  # number of pitch classes
+        nc_theta: int = 500,  # number of theta classes
+        imgsz: int = 640,  # model input size (assumes squared input)
         epochs: int = 100,
-        dropout: float = 0.25, # dropout rate for classification heads
+        dropout: float = 0.25,  # dropout rate for classification heads
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
         ):
-    
+
     # create dir to store checkpoints
     ckpt_dir = ROOT / 'runs' / 'horizon' / 'train' / dataset_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -57,34 +61,34 @@ def run(dataset_name: str, # fiftyone dataset name
     if "RGB" in dataset_name:
         train_dataloader = get_train_rgb_dataloader(
             dataset=(fo.load_dataset(dataset_name)
-                    .match(F("ground_truth_pl.polylines.closed") == [False])
-                    .match_tags(train_tag)
-                    ),
+                     .match(F("ground_truth_pl.polylines.closed") == [False])
+                     .match_tags(train_tag)
+                     ),
             imgsz=imgsz,
         )
 
         val_dataloader = get_val_rgb_dataloader(
             dataset=(fo.load_dataset(dataset_name)
-                    .match(F("ground_truth_pl.polylines.closed") == [False])
-                    .match_tags(val_tag)
-                    .take(5000, seed=51)
-                    ),
+                     .match(F("ground_truth_pl.polylines.closed") == [False])
+                     .match_tags(val_tag)
+                     .take(5000, seed=51)
+                     ),
             imgsz=imgsz,
         )
     else:
         train_dataloader = get_train_IR16bit_dataseloader(
             dataset=(fo.load_dataset(dataset_name)
-                    .match(F("ground_truth_pl.polylines.closed") == [False])
-                    .match_tags(train_tag)
-                    ),
+                     .match(F("ground_truth_pl.polylines.closed") == [False])
+                     .match_tags(train_tag)
+                     ),
             imgsz=imgsz,
         )
 
         val_dataloader = get_val_IR16bit_dataloader(
             dataset=(fo.load_dataset(dataset_name)
-                    .match(F("ground_truth_pl.polylines.closed") == [False])
-                    .match_tags(val_tag)
-                    ),
+                     .match(F("ground_truth_pl.polylines.closed") == [False])
+                     .match_tags(val_tag)
+                     ),
             imgsz=imgsz,
         )
 
@@ -95,13 +99,13 @@ def run(dataset_name: str, # fiftyone dataset name
             m.p = dropout  # set dropout
 
     for p in model.parameters():
-            p.requires_grad = True
+        p.requires_grad = True
 
     optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
 
     lrf = 0.001  # final lr (fraction of lr0)
     # lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - lrf) + lrf  # cosine
-    lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
+    def lf(x): return (1 - x / epochs) * (1 - lrf) + lrf  # linear
     scheduler = LambdaLR(optimizer, lr_lambda=lf)
 
     loss_pitch = CrossEntropyLoss(label_smoothing=0.0)
@@ -114,11 +118,13 @@ def run(dataset_name: str, # fiftyone dataset name
 
     model.info()
     LOGGER.info("Starting training...\n")
+    train_losses = dict(pitch=[], theta=[], total=[])
+    val_losses = dict(pitch=[], theta=[], total=[])
 
     for epoch in range(epochs):
         t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
         v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
-        
+
         model.train()
         pbar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), bar_format=TQDM_BAR_FORMAT)
         for i, data in pbar:
@@ -129,7 +135,7 @@ def run(dataset_name: str, # fiftyone dataset name
             x_pitch, x_theta = model(images)
 
             # process targets
-            pitch, theta = targets[...,0], targets[...,1]
+            pitch, theta = targets[..., 0], targets[..., 1]
             pitch = (pitch * model.nc_pitch).long().clamp(0, model.nc_pitch - 1)
             theta = (theta * model.nc_theta).long().clamp(0, model.nc_theta - 1)
 
@@ -168,7 +174,7 @@ def run(dataset_name: str, # fiftyone dataset name
                 x_pitch, x_theta = ema.ema(images)
 
                 # process targets
-                pitch, theta = targets[...,0], targets[...,1]
+                pitch, theta = targets[..., 0], targets[..., 1]
                 pitch = (pitch * model.nc_pitch).long().clamp(0, ema.ema.nc_pitch - 1)
                 theta = (theta * model.nc_theta).long().clamp(0, ema.ema.nc_theta - 1)
 
@@ -209,6 +215,28 @@ def run(dataset_name: str, # fiftyone dataset name
         torch.save(ckpt, ckpt_dir / 'last.pt')
         del ckpt
 
+        # plot losses
+        train_losses['pitch'].append(t_ploss)
+        train_losses['theta'].append(t_tloss)
+        train_losses['total'].append(t_loss)
+        val_losses['pitch'].append(v_ploss)
+        val_losses['theta'].append(v_tloss)
+        val_losses['total'].append(v_loss)
+        plot_losses(ckpt_dir, train_losses, val_losses)
+
+
+def plot_losses(ckpt_dir, train_losses, val_losses):
+    fig_train = px.line(pd.DataFrame(train_losses),
+                        labels={'x': 'epoch', 'y': 'loss'},
+                        title='Training Loss')
+    fig_val = px.line(pd.DataFrame(val_losses),
+                      labels={'x': 'epoch', 'y': 'loss'},
+                      title='Validation Loss')
+
+    fig_train.write_image(str(ckpt_dir / 'train_losses.png'))
+    fig_val.write_image(str(ckpt_dir / 'val_losses.png'))
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_name', type=str, help='dataset name', required=True)
@@ -220,12 +248,12 @@ def parse_args():
     parser.add_argument('--imgsz', type=int, default=640, help='train, val image size')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs')
     parser.add_argument('--dropout', type=float, default=0.25, help='dropout rate')
-    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--device', default='cuda' if torch.cuda.is_available()
+                        else 'cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     args = parser.parse_args()
     return args
+
 
 if __name__ == '__main__':
     args = parse_args()
     run(**vars(args))
-
-
