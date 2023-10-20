@@ -39,6 +39,8 @@ def run(dataset_name: str,  # fiftyone dataset name
         weights: str = 'yolov5n.pt',  # initial weights path
         nc_pitch: int = 500,  # number of pitch classes
         nc_theta: int = 500,  # number of theta classes
+        pitch_weight: float = 1.0,  # pitch loss weight
+        theta_weight: float = 1.0,  # theta loss weight
         imgsz: int = 640,  # model input size (assumes squared input)
         epochs: int = 100,
         dropout: float = 0.25,  # dropout rate for classification heads
@@ -71,7 +73,7 @@ def run(dataset_name: str,  # fiftyone dataset name
             dataset=(fo.load_dataset(dataset_name)
                      .match(F("ground_truth_pl.polylines.closed") == [False])
                      .match_tags(val_tag)
-                     .take(5000, seed=51)
+                     #.take(5000, seed=51)
                      ),
             imgsz=imgsz,
         )
@@ -142,7 +144,7 @@ def run(dataset_name: str,  # fiftyone dataset name
             # backward
             _loss_pitch = loss_pitch(x_pitch, pitch)
             _loss_theta = loss_theta(x_theta, theta)
-            loss = _loss_pitch + _loss_theta
+            loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta
             scaler.scale(loss).backward()
 
             # Optimize
@@ -181,7 +183,7 @@ def run(dataset_name: str,  # fiftyone dataset name
                 # store losses
                 _loss_pitch = loss_pitch(x_pitch, pitch)
                 _loss_theta = loss_theta(x_theta, theta)
-                loss = _loss_pitch + _loss_theta
+                loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta
 
                 v_loss = (v_loss * i + loss.item()) / (i + 1)  # update mean losses
                 v_ploss = (v_ploss * i + _loss_pitch.item()) / (i + 1)
@@ -245,6 +247,8 @@ def parse_args():
     parser.add_argument('--weights', type=str, default='yolov5n.pt', help='initial weights path')
     parser.add_argument('--nc_pitch', type=int, default=500, help='number of pitch classes')
     parser.add_argument('--nc_theta', type=int, default=500, help='number of theta classes')
+    parser.add_argument('--pitch_weight', type=float, default=1.0, help='pitch loss weight')
+    parser.add_argument('--theta_weight', type=float, default=1.0, help='theta loss weight')
     parser.add_argument('--imgsz', type=int, default=640, help='train, val image size')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs')
     parser.add_argument('--dropout', type=float, default=0.25, help='dropout rate')

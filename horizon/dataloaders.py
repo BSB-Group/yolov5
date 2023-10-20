@@ -183,6 +183,7 @@ class HorizonDataset(FiftyOneBaseDataset):
         # read points (list of x,y)
         target = sample["ground_truth_pl"]["polylines"][0]["points"][0]
         target = np.array(target).reshape(-1, 2)
+        # denormalize points
         target[:, 0] *= image_w
         target[:, 1] *= image_h
 
@@ -194,8 +195,12 @@ class HorizonDataset(FiftyOneBaseDataset):
             image_h, image_w = image.shape[1:]  # tensor has now (C,H,W)
             target = augmented["keypoints"]
 
-        if self.target_transform:
-            target = self.target_transform(target, image_w, image_h)
+        try:
+            if self.target_transform:
+                target = self.target_transform(target, image_w, image_h)
+        except Exception as e:
+            print(f"Error in target_transform for sample {fpath}: {e}")
+            raise e
 
         return image, target
 
