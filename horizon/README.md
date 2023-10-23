@@ -10,13 +10,16 @@
 - [ ] Implement metrics for assessing horizon detection
   - [ ] Take argmax of classification output --> straightforward value and confidence
   - [ ] Interpret output of classification heads as a distribution and take mean and std as value and confidence?
-  - [ ] Same as before but with "peak suppression" (describe this scenario in more detail with example pictures)
+  - [ ] Same as before but with "peak suppression" or GMMs (describe this scenario in more detail with example pictures)
 - [x] Refactor code (/horizon/transforms.py, /horizon/train.py)
 - [ ] Implement `EnsembleModel` (horizon + bboxes)
 - [ ] Implement "horizon-check" for datasets (check for outliers in theta and pitch)
 - [ ] Implement logger (compatible with `wandb`)
 - [ ] Export `EnsembleModel` to TensorRT
 - [ ] Speed benchmarks for `EnsembleModel`
+- [ ] Speed up training by:
+  - [ ] Optimising fiftyone dataloader
+  - [ ] Having a yolo-like format for the horizon annotations
 - [ ] Document results and how to reproduce them
 
 ## Future work
