@@ -59,13 +59,13 @@ def get_val_rgb_dataloader(dataset: fo.Dataset,
 
 
 def get_train_IR16bit_dataseloader(dataset: fo.Dataset,
-                               imgsz: int,
-                               batch_size: int = 64,
-                               num_workers: int = 4,
-                               shuffle: bool = True,
-                               pin_memory: bool = False,
-                               dataloader_kwargs: dict = {},
-                               ):
+                                   imgsz: int,
+                                   batch_size: int = 64,
+                                   num_workers: int = 4,
+                                   shuffle: bool = True,
+                                   pin_memory: bool = False,
+                                   dataloader_kwargs: dict = {},
+                                   ):
     dataset = HorizonDataset(
         dataset=dataset,
         transform=T.horizon_augment_IR16bit(imgsz),
@@ -81,13 +81,13 @@ def get_train_IR16bit_dataseloader(dataset: fo.Dataset,
 
 
 def get_val_IR16bit_dataloader(dataset: fo.Dataset,
-                           imgsz: int,
-                           batch_size: int = 64,
-                           num_workers: int = 4,
-                           shuffle: bool = False,
-                           pin_memory: bool = False,
-                           dataloader_kwargs: dict = {},
-                           ):
+                               imgsz: int,
+                               batch_size: int = 64,
+                               num_workers: int = 4,
+                               shuffle: bool = False,
+                               pin_memory: bool = False,
+                               dataloader_kwargs: dict = {},
+                               ):
     dataset = HorizonDataset(
         dataset=dataset,
         transform=T.horizon_base_IR16bit(imgsz),

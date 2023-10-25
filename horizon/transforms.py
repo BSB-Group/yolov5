@@ -26,17 +26,25 @@ def horizon_augment_RGB(imgsz: int) -> A.Compose:
         imgsz (int): image size
     """
     return A.Compose([
+        # weather transforms
+        A.OneOf([
+            A.RandomRain(p=1),
+            A.RandomSunFlare(p=1),
+            A.RandomFog(p=1, fog_coef_lower=0.1, fog_coef_upper=0.3),
+        ], p=0.05),
+
         # image transforms
+        A.RandomCropFromBorders(p=0.2),
         A.RandomBrightnessContrast(p=0.5),
         A.HueSaturationValue(p=0.5),
         A.CLAHE(p=0.05),
-        A.Blur(p=0.2),
+        A.Blur(p=0.05),
 
         # geometric transforms
         A.LongestMaxSize(max_size=imgsz),
         A.HorizontalFlip(p=0.5),
         A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
-        A.ShiftScaleRotate(p=1, shift_limit=0.1, scale_limit=0.25, rotate_limit=20, border_mode=cv2.BORDER_CONSTANT),
+        A.ShiftScaleRotate(p=1, shift_limit=0.1, scale_limit=0.25, rotate_limit=30, border_mode=cv2.BORDER_CONSTANT),
 
         # torch-related transforms
         A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
@@ -128,9 +136,9 @@ def points_to_normalised_pitch_theta(imgsz: int):
     Convert points to pitch, theta.
     """
     def _points_to_pitch_theta(points: np.ndarray,
-                              image_w: int = imgsz,
-                              image_h: int = imgsz,
-                              ) -> np.ndarray:
+                               image_w: int = imgsz,
+                               image_h: int = imgsz,
+                               ) -> np.ndarray:
         """
         Convert points to pitch, theta.
         """
@@ -143,5 +151,5 @@ def points_to_normalised_pitch_theta(imgsz: int):
         x1, y1, x2, y2 = points.flatten()
         pitch, theta = points_to_pitch_theta(x1, y1, x2, y2)
         return np.array([pitch, theta])
-    
+
     return _points_to_pitch_theta
