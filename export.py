@@ -134,11 +134,17 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr('ONNX
     # YOLOv5 ONNX export
     check_requirements('onnx')
     import onnx
+    from horizon.models import AHOY
 
     LOGGER.info(f'\n{prefix} starting export with onnx {onnx.__version__}...')
     f = file.with_suffix('.onnx')
 
-    output_names = ['output0', 'output1'] if isinstance(model, SegmentationModel) else ['output0']
+    if isinstance(model, SegmentationModel):
+        output_names = ['output0', 'output1']
+    elif isinstance(model, AHOY):
+        output_names = ['output0', 'output1', 'output2']
+    else:
+        output_names = ['output0']
     if dynamic:
         dynamic = {'images': {0: 'batch', 2: 'height', 3: 'width'}}  # shape(1,3,640,640)
         if isinstance(model, SegmentationModel):
@@ -146,6 +152,10 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr('ONNX
             dynamic['output1'] = {0: 'batch', 2: 'mask_height', 3: 'mask_width'}  # shape(1,32,160,160)
         elif isinstance(model, DetectionModel):
             dynamic['output0'] = {0: 'batch', 1: 'anchors'}  # shape(1,25200,85)
+        elif isinstance(model, AHOY):
+            dynamic['output0'] = {0: 'batch', 1: 'anchors'}  # shape(1,25200,anchors)
+            dynamic['output1'] = {0: 'batch', 1: 'nc_pitch'}  # shape(1,1,nc_pitch)
+            dynamic['output2'] = {0: 'batch', 1: 'nc_theta'}  # shape(1,1,nc_theta)
 
     torch.onnx.export(
         model.cpu() if dynamic else model,  # --dynamic only compatible with cpu

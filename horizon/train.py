@@ -3,8 +3,8 @@ import sys
 import argparse
 from pathlib import Path
 from datetime import datetime
-from tqdm import tqdm
 from copy import deepcopy
+from tqdm import tqdm
 
 import fiftyone as fo
 from fiftyone import ViewField as F
@@ -24,7 +24,8 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from utils.general import TQDM_BAR_FORMAT, LOGGER
-from utils.torch_utils import smart_optimizer, ModelEMA, select_device
+from utils.torch_utils import smart_optimizer, ModelEMA
+from utils.downloads import attempt_download
 
 from horizon.models import HorizonModel
 from horizon.dataloaders import (get_train_rgb_dataloader,
@@ -52,7 +53,10 @@ def run(dataset_name: str,  # fiftyone dataset name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     LOGGER.info(f"{ckpt_dir=}\n")
 
-    # load model
+    if not os.path.exists(weights):
+        weights = attempt_download(weights)  # download if not found locally
+
+    # load as horizon model
     model = HorizonModel(weights, nc_pitch, nc_theta, device=device)
     for m in model.model:
         print(m.i, m.f, m.type)
@@ -67,15 +71,17 @@ def run(dataset_name: str,  # fiftyone dataset name
                      .match_tags(train_tag)
                      ),
             imgsz=imgsz,
+            batch_size=64 if imgsz == 640 else 16,
         )
 
         val_dataloader = get_val_rgb_dataloader(
             dataset=(fo.load_dataset(dataset_name)
                      .match(F("ground_truth_pl.polylines.closed") == [False])
                      .match_tags(val_tag)
-                     #.take(5000, seed=51)
+                     # .take(5000, seed=51)
                      ),
             imgsz=imgsz,
+            batch_size=64 if imgsz == 640 else 16,
         )
     else:
         train_dataloader = get_train_IR16bit_dataseloader(
@@ -107,7 +113,7 @@ def run(dataset_name: str,  # fiftyone dataset name
 
     lrf = 0.001  # final lr (fraction of lr0)
     # lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - lrf) + lrf  # cosine
-    def lf(x): return (1 - x / epochs) * (1 - lrf) + lrf  # linear
+    lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
     scheduler = LambdaLR(optimizer, lr_lambda=lf)
 
     loss_pitch = CrossEntropyLoss(label_smoothing=0.0)
@@ -128,7 +134,10 @@ def run(dataset_name: str,  # fiftyone dataset name
         v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
 
         model.train()
-        pbar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), bar_format=TQDM_BAR_FORMAT)
+        pbar = tqdm(enumerate(train_dataloader),
+                    total=len(train_dataloader),
+                    bar_format=TQDM_BAR_FORMAT)
+
         for i, data in pbar:
             images, targets = data
             images, targets = images.to(model.device), targets.to(model.device)
@@ -159,14 +168,15 @@ def run(dataset_name: str,  # fiftyone dataset name
             t_loss = (t_loss * i + loss.item()) / (i + 1)  # update mean losses
             t_ploss = (t_ploss * i + _loss_pitch.item()) / (i + 1)
             t_tloss = (t_tloss * i + _loss_theta.item()) / (i + 1)
-            mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
+            mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0}"  # GB
             losses_str = f"{t_loss:>12.3g}{t_ploss:>12.3g}{t_tloss:>12.3g}"
             pbar.desc = f"{'train':>6}{f'{epoch + 1}/{epochs}':>10}{mem:>10}{losses_str}" + ' ' * 10
 
         scheduler.step()
 
         model.eval()
-        pbar = tqdm(enumerate(val_dataloader), total=len(val_dataloader), bar_format=TQDM_BAR_FORMAT)
+        pbar = tqdm(enumerate(val_dataloader), total=len(
+            val_dataloader), bar_format=TQDM_BAR_FORMAT)
         for i, data in pbar:
             images, targets = data
             images, targets = images.to(model.device), targets.to(model.device)
@@ -188,7 +198,7 @@ def run(dataset_name: str,  # fiftyone dataset name
                 v_loss = (v_loss * i + loss.item()) / (i + 1)  # update mean losses
                 v_ploss = (v_ploss * i + _loss_pitch.item()) / (i + 1)
                 v_tloss = (v_tloss * i + _loss_theta.item()) / (i + 1)
-            mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
+            mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0}"  # GB
             losses_str = f"{v_loss:>12.3g}{v_ploss:>12.3g}{v_tloss:>12.3g}"
             pbar.desc = f"{'val':>6}{f'{epoch + 1}/{epochs}':>10}{mem:>10}{losses_str}" + ' ' * 10
 
@@ -254,8 +264,7 @@ def parse_args():
     parser.add_argument('--dropout', type=float, default=0.25, help='dropout rate')
     parser.add_argument('--device', default='cuda' if torch.cuda.is_available()
                         else 'cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 if __name__ == '__main__':

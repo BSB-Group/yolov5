@@ -21,6 +21,7 @@ Usage - formats:
 
 import argparse
 import json
+import yaml
 import os
 import sys
 from pathlib import Path
@@ -125,11 +126,16 @@ def run(
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
+        hyp=None,
 ):
     if model is not None:
         hyp = model.hyp  # hyperparameters
+    elif isinstance(hyp, str):
+        with open(hyp, errors='ignore') as f:
+            hyp = yaml.safe_load(f)  # load hyps dict
+        LOGGER.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
     else:
-        hyp = False
+        LOGGER.info('Hyperparameters missing, default values used.')
 
     # Initialize/load model and set device
     training = model is not None
@@ -373,8 +379,10 @@ def parse_opt():
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
+    parser.add_argument('--hyp', type=str, default='', help='hyperparameters path')
     opt = parser.parse_args()
     opt.data = check_yaml(opt.data)  # check YAML
+    opt.hyp = check_yaml(opt.hyp) if opt.hyp else opt.hyp  # check YAML
     opt.save_json |= opt.data.endswith('coco.yaml')
     opt.save_txt |= opt.save_hybrid
     print_args(vars(opt))

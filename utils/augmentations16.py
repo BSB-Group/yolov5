@@ -31,7 +31,9 @@ def get_16_to_8_transform(augment):
         # meant to be used for validation, deterministic
         return A.Compose([
             Clip(p=1.0, lower_limit=(llimit, llimit), upper_limit=(ulimit, ulimit)),
+            CLAHE(p=0.0, clip_limit=(4, 4), tile_grid_size=(-1, -1)),
             NormalizeMinMax(p=1.0),
+            A.UnsharpMask(p=0.0, threshold=5),
             A.ToRGB(p=1.0),
         ])
 

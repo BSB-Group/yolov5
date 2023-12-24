@@ -181,3 +181,14 @@ def draw_horizon(image,
 
     cv2.line(image, (int(x1), int(y1)), (int(x2), int(y2)), color, diameter)
     return image
+
+
+def draw_bboxes(image, dets, color=(0, 255, 0), thickness=2):
+    """
+    Visualize bounding boxes on image.
+    """
+    image = image.copy()
+    for det in dets:
+        x1, y1, x2, y2 = det[:4]
+        cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, thickness)
+    return image
