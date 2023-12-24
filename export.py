@@ -254,16 +254,23 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
     assert im.device.type != 'cpu', 'export running on CPU but must be on GPU, i.e. `python export.py --device 0`'
     try:
         import tensorrt as trt
+        from horizon.models import AHOY
     except Exception:
         if platform.system() == 'Linux':
             check_requirements('nvidia-tensorrt', cmds='-U --index-url https://pypi.ngc.nvidia.com')
         import tensorrt as trt
 
     if trt.__version__[0] == '7':  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
-        grid = model.model[-1].anchor_grid
-        model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
-        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
-        model.model[-1].anchor_grid = grid
+        if isinstance(model, AHOY):
+            grid = model.obj_det.model[-1].anchor_grid
+            model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
+            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+            model.obj_det.model[-1].anchor_grid = grid
+        else:
+            grid = model.model[-1].anchor_grid
+            model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
+            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+            model.model[-1].anchor_grid = grid
     else:  # TensorRT >= 8
         check_version(trt.__version__, '8.0.0', hard=True)  # require tensorrt>=8.0.0
         export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
