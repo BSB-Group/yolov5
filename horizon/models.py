@@ -144,8 +144,8 @@ class ObjectsModel(BaseModel):
 class AHOY(nn.Module):
     """
     A
-    H-orizon
-    O-bject detection
+    H-orizon &
+    O-bject detector based on
     Y-OLOv5
     """
 
