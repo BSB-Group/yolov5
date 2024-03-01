@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import Union
+
 import torch
 from torch import nn
 
+from utils.general import LOGGER
 from utils.plots import feature_visualization
-from utils.general import LOGGER, non_max_suppression
 from utils.torch_utils import select_device
 from models.experimental import attempt_load
 from models.yolo import BaseModel, DetectionModel
@@ -20,7 +22,7 @@ class HorizonModel(BaseModel):
         weights: str = "yolov5n.pt",
         nc_pitch: int = 500,
         nc_theta: int = 500,
-        device: str | torch.device = None,  # automatically select device
+        device: Union[str, torch.device] = None,  # automatically select device
         cutoff: int = None,
         fp16: bool = False,
         fuse: bool = False,  # false for training, true for inference
@@ -56,9 +58,7 @@ class HorizonModel(BaseModel):
             raise ValueError("model must be a path to a .pt file")
 
         if isinstance(model, DetectionModel):
-            LOGGER.warning(
-                "WARNING ⚠️ converting YOLOv5 DetectionModel to HorizonModel"
-            )
+            LOGGER.warning("WARNING ⚠️ converting YOLOv5 DetectionModel to HorizonModel")
             self.cutoff = _find_cutoff(model) if cutoff is None else cutoff
             self._from_detection_model(model, self.cutoff)  # inplace modification
 
@@ -117,7 +117,7 @@ class ObjectsModel(BaseModel):
     def __init__(
         self,
         weights: str = "yolov5n.pt",
-        device: str | torch.device = None,  # automatically select device
+        device: Union[str, torch.device] = None,  # automatically select device
         fp16: bool = False,
         fuse: bool = False,
     ):
@@ -128,7 +128,9 @@ class ObjectsModel(BaseModel):
         if Path(weights).is_file() or weights.endswith(".pt"):
             model = attempt_load(weights, device="cpu", fuse=fuse)
             stride = model.stride
-            names = model.module.names if hasattr(model, 'module') else model.names  # get class names
+            names = (
+                model.module.names if hasattr(model, "module") else model.names
+            )  # get class names
             LOGGER.info(f"Loaded weights from {weights}")
         else:
             raise ValueError("model must be a path to a .pt file")
@@ -144,8 +146,8 @@ class ObjectsModel(BaseModel):
 class AHOY(nn.Module):
     """
     A
-    H-orizon &
-    O-bject detector based on
+    H-orizon
+    O-bject detection
     Y-OLOv5
     """
 
@@ -154,10 +156,10 @@ class AHOY(nn.Module):
         self,
         obj_det_weigths: str,
         hor_det_weights: str,
-        device: str | torch.device = None,  # automatically select device
+        device: Union[str, torch.device] = None,  # automatically select device
         fp16: bool = False,
-        fuse: bool = True, # fuse conv and bn layers
-        inplace: bool = True, # inplace modification of models
+        fuse: bool = True,  # fuse conv and bn layers
+        inplace: bool = True,  # inplace modification of models
     ):
         super().__init__()
         self.obj_det = ObjectsModel(
@@ -180,6 +182,47 @@ class AHOY(nn.Module):
         return objects, pitch, theta
 
 
+class DAN(nn.Module):
+    """
+    Day
+    And
+    Night
+
+    Two models: one for RGB images and one for IR (thermal) images.
+    """
+
+    # Ensemble of models
+    def __init__(
+        self,
+        rgb_model: AHOY,
+        ir_model: AHOY,
+    ):
+        super().__init__()
+        # check if both models are in same device
+        if rgb_model.device != ir_model.device:
+            raise ValueError("Both models must be on the same device")
+        self.device = rgb_model.device
+
+        # check if both models are in fp16
+        if rgb_model.fp16 != ir_model.fp16:
+            raise ValueError("Both models must be in the same precision")
+        self.fp16 = rgb_model.fp16
+
+        self.rgb_model = rgb_model
+        self.ir_model = ir_model
+
+    def forward(self, x_rgb, x_ir, profile=False, visualize=False):
+        """
+        Forward pass through models.
+        """
+        rgb_out = self.rgb_model(x_rgb, profile, visualize)
+        ir_out = self.ir_model(x_ir, profile, visualize)
+        return rgb_out, ir_out
+        # rgb_objs, rgb_pitch, rgb_theta = self.rgb_model(x_rgb, profile, visualize)
+        # ir_objs, ir_pitch, ir_theta = self.ir_model(x_ir, profile, visualize)
+        # return rgb_objs, rgb_pitch, rgb_theta, ir_objs, ir_pitch, ir_theta
+
+
 class Hydra(BaseModel):
     """
     Model with two heads: object detection and horizon detection.
@@ -192,7 +235,7 @@ class Hydra(BaseModel):
         weights: str = "yolov5n.pt",
         nc_pitch: int = 500,
         nc_theta: int = 500,
-        device: str | torch.device = None,  # automatically select device
+        device: Union[str, torch.device] = None,  # automatically select device
         cutoff: int = None,
         fp16: bool = False,
         task: str = "both",  # "detection", "horizon", "both"
@@ -238,9 +281,7 @@ class Hydra(BaseModel):
             raise ValueError("model must be a path to a .pt file")
 
         if isinstance(model, DetectionModel):
-            LOGGER.warning(
-                "WARNING ⚠️ converting YOLOv5 DetectionModel to HorizonModel"
-            )
+            LOGGER.warning("WARNING ⚠️ converting YOLOv5 DetectionModel to HorizonModel")
             self.cutoff = _find_cutoff(model) if cutoff is None else cutoff
             self._add_classification_heads(model, self.cutoff)  # inplace modification
 
@@ -330,8 +371,6 @@ class Hydra(BaseModel):
                 y.append(x if m.i in self.save else None)  # save output
                 if visualize:
                     feature_visualization(x, m.type, m.i, save_dir=visualize)
-
-        return (x_pitch, x_theta)
 
         return (x, x_pitch, x_theta)
 

@@ -11,11 +11,13 @@ class HostDeviceMem(object):
         self.host = host_mem
         self.device = device_mem
         self.shape = shape
+        self.dtype = host_mem.dtype
 
     def __str__(self):
-        return "Host:\n * " + str(self.host) \
+        return str(self.host) \
             + "\nDevice:\n * " + str(self.device) \
-            + "\nShape:\n * " + str(self.shape)
+            + "\nShape:\n * " + str(self.shape) \
+            + "\nDtype:\n * " + str(self.dtype)
 
     def __repr__(self):
         return self.__str__()

@@ -27,7 +27,7 @@ from utils.general import TQDM_BAR_FORMAT, LOGGER
 from utils.torch_utils import smart_optimizer, ModelEMA
 from utils.downloads import attempt_download
 
-from horizon.models import HorizonModel
+from models.custom import HorizonModel
 from horizon.dataloaders import (get_train_rgb_dataloader,
                                  get_val_rgb_dataloader,
                                  get_train_IR16bit_dataseloader,
