@@ -15,7 +15,7 @@ import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
 from utils.augmentations16 import CLAHE, Clip, NormalizeMinMax
-from horizon.utils import points_to_pitch_theta #, points_to_hough
+from utils.horizon import points_to_pitch_theta  # points_to_hough
 
 
 def horizon_augment_RGB(imgsz: int) -> A.Compose:

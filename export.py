@@ -166,7 +166,7 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
     # YOLOv5 ONNX export
     check_requirements("onnx>=1.12.0")
     import onnx
-    from horizon.models import AHOY, DAN
+    from models.custom import AHOY, DAN
 
     LOGGER.info(f"\n{prefix} starting export with onnx {onnx.__version__}...")
     f = str(file.with_suffix(".onnx"))
@@ -352,7 +352,7 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
         assert im.device.type != "cpu", "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
     try:
         import tensorrt as trt
-        from horizon.models import AHOY, DAN
+        from models.custom import AHOY, DAN
     except Exception:
         if platform.system() == "Linux":
             check_requirements("nvidia-tensorrt", cmds="-U --index-url https://pypi.ngc.nvidia.com")
