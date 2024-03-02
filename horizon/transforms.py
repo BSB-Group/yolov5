@@ -14,7 +14,7 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
-from utils.augmentations16 import CLAHE, Clip, NormalizeMinMax
+import utils.augmentations16 as A16
 from utils.horizon import points_to_pitch_theta  # points_to_hough
 
 
@@ -79,9 +79,9 @@ def horizon_augment_IR16bit(imgsz: int) -> A.Compose:
     """
     return A.Compose([
         # image transforms (16-bit compatible)
-        Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
-        CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(-1, -1)),
-        NormalizeMinMax(p=1.0),
+        A16.Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
+        A16.CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(-1, -1)),
+        A16.NormalizeMinMax(p=1.0),
         A.UnsharpMask(p=0.5, threshold=5),
         A.ToRGB(p=1.0),
 
@@ -115,9 +115,9 @@ def horizon_base_IR16bit(imgsz: int,
     """
     return A.Compose([
         # image transforms (16-bit compatible)
-        Clip(p=1.0, lower_limit=(lower_limit,) * 2, upper_limit=(upper_limit,) * 2),
-        CLAHE(p=1.0 if clahe else 0.0, clip_limit=(4, 4), tile_grid_size=(-1, -1)),
-        NormalizeMinMax(p=1.0),
+        A16.Clip(p=1.0, lower_limit=(lower_limit,) * 2, upper_limit=(upper_limit,) * 2),
+        A16.CLAHE(p=1.0 if clahe else 0.0, clip_limit=(4, 4), tile_grid_size=(-1, -1)),
+        A16.NormalizeMinMax(p=1.0),
         A.UnsharpMask(p=1.0 if unsharp_mask else 0.0, threshold=5),
         A.ToRGB(p=1.0),
 
