@@ -240,9 +240,9 @@ class YoloTRT:
             Applicable only for offset-theta model.
         """
         if isinstance(ims, np.ndarray):
-            assert ims.ndim == 3, "Input image must have 3 dimensions (h, w, c)"
+            assert ims.ndim == 4, "Input image must have 3 dimensions (b, h, w, c)"
         elif isinstance(ims, (list, tuple)):
-            assert all(im.ndim == 3 for im in ims), "All images must have 3 dimensions"
+            assert all(im.ndim == 4 for im in ims), "All images must have 4 dimensions"
             
         orig_shape = ims[0].shape[:2]
         dets = self(ims, conf_thresh, iou_thresh, curve_fit)
