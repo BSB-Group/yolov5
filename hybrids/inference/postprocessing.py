@@ -1,11 +1,12 @@
 from typing import Tuple
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.special import softmax
 
 
 def cxcywh_to_xyxy(bboxes: np.ndarray) -> np.ndarray:
     """
-    Convert bounding boxes from (center_x, center_y, width, height) to 
+    Convert bounding boxes from (center_x, center_y, width, height) to
     (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format.
 
     Parameters
@@ -57,7 +58,7 @@ def xyxy_to_xyxyn(bboxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     ----------
     bboxes : np.ndarray (N, 4)
         bounding boxes in (x, y, x, y) format
-    shape : Tuple[int, int] 
+    shape : Tuple[int, int]
         shape in (height, width) to which should be normalized
 
     Returns
@@ -80,7 +81,7 @@ def xyxyn_to_xyxy(bboxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     ----------
     bboxes : np.ndarray (N, 4)
         bounding boxes in (x, y, x, y) format
-    shape : Tuple[int, int] 
+    shape : Tuple[int, int]
         shape in (height, width) to which should be normalized
 
     Returns
@@ -116,8 +117,10 @@ def scale_boxes(bboxes, from_shape, to_shape):
     # gain  = old / new
     gain = min(from_shape[0] / to_shape[0], from_shape[1] / to_shape[1])
     # wh padding
-    pad = ((from_shape[1] - to_shape[1] * gain) / 2,  # x padding
-           (from_shape[0] - to_shape[0] * gain) / 2)  # y padding
+    pad = (
+        (from_shape[1] - to_shape[1] * gain) / 2,  # x padding
+        (from_shape[0] - to_shape[0] * gain) / 2,
+    )  # y padding
 
     bboxes[..., [0, 2]] -= pad[0]  # x padding
     bboxes[..., [1, 3]] -= pad[1]  # y padding
@@ -127,7 +130,7 @@ def scale_boxes(bboxes, from_shape, to_shape):
 
 
 def clip_boxes(boxes, shape):
-    # Clip boxes (xyxy) to image shape (height, width)
+    """Clip boxes (xyxy) to image shape (height, width)"""
     boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
     boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
 
@@ -162,19 +165,21 @@ def intersection_area(target_box: np.ndarray, boxes: np.ndarray) -> np.ndarray:
     """
     calculate intersection of target boxes with all others in boxes
     Returns:
-        (np.ndarray) areas of intersection bounding boxes 
+        (np.ndarray) areas of intersection bounding boxes
     """
     xx1, yy1, xx2, yy2 = intersection_box(target_box, boxes)
     w = np.maximum(0, xx2 - xx1 + 1)
     h = np.maximum(0, yy2 - yy1 + 1)
 
-    return w*h
+    return w * h
 
 
-def iou(target_box: np.ndarray,
-        boxes: np.ndarray,
-        target_area: np.ndarray,
-        areas: np.ndarray) -> np.ndarray:
+def iou(
+    target_box: np.ndarray,
+    boxes: np.ndarray,
+    target_area: np.ndarray,
+    areas: np.ndarray,
+) -> np.ndarray:
     """
     Calculate intersection over union of target box with all others
 
@@ -198,7 +203,12 @@ def iou(target_box: np.ndarray,
     return inter / union
 
 
-def nms(bboxes: np.ndarray, scores: np.ndarray, iou_thresh: float, classes: np.ndarray = None) -> np.ndarray:
+def nms(
+    bboxes: np.ndarray,
+    scores: np.ndarray,
+    iou_thresh: float,
+    classes: np.ndarray = None,
+) -> np.ndarray:
     """
     Non-Maximum-Supression (NMS) algorithm to remove overlapping bounding boxes.
 
@@ -244,6 +254,72 @@ def nms(bboxes: np.ndarray, scores: np.ndarray, iou_thresh: float, classes: np.n
     return keep
 
 
+def postprocess_bboxes(
+    model_output: np.ndarray,
+    input_hw: tuple,
+    orig_hw: tuple,
+    conf_thresh: float,
+    iou_thresh: float,
+) -> np.ndarray:
+    """
+    Transform raw yolo-like output to bounding boxes, scores and classes.
+
+    Parameters
+    ----------
+    model_output : np.ndarray (N, 4 + 1 + NC)
+        Where:
+        - N is the number of detected bounding boxes,
+        - 4 are the coordinates of the bounding box,
+        - 1 is the confidence score of the bounding box,
+        - NC is the number of classes.
+    input_hw : tuple
+        Input image shape (height, width)
+    orig_hw : tuple
+        Original image shape (height, width)
+    conf_thresh : float
+        Confidence threshold for p(bbox)
+        Predictions with score < conf are not considered as output.
+    iou_thresh : float
+        Minimum IOU to be counted as a duplicate detection.
+
+    Returns
+    -------
+    (boxes, scores, classes) : tuple
+        Where:
+        - boxes are the coordinates of the detected bounding boxes in
+        the format (top-left x, top-left y, bottom-right x, bottom-right y)
+        - scores are the confidence scores of the detected bounding boxes.
+        - classes are the class labels of the detected bounding boxes.
+    """
+    if model_output.shape[0] < model_output.shape[1]:
+        from .misc import yolov8_to_yolov5
+
+        model_output = yolov8_to_yolov5(model_output)
+
+    # Filter out boxes with low confidence
+    model_output = model_output[model_output[..., 4] > conf_thresh]
+
+    # Unpack model_output
+    bboxes = model_output[..., :4]
+    scores = model_output[..., 4]
+    class_prob = model_output[..., 5:]
+
+    bboxes = cxcywh_to_xyxy(bboxes)
+
+    # p(class | bbox) * p(bbox)
+    class_scores = class_prob * scores[:, None]
+    classes = np.argmax(class_scores, axis=1)
+
+    # Class agnostic since classes is not used
+    keep = nms(bboxes, scores, iou_thresh)
+    bboxes = bboxes[keep]
+    classes = classes[keep]
+    scores = scores[keep]
+
+    bboxes = scale_boxes(bboxes, input_hw, orig_hw)
+    return bboxes, scores, classes
+
+
 def offset_theta_to_points(
     offset: float, theta: float, w: int = 1, h: int = 1, offset_buffer: float = 0.15
 ):
@@ -280,6 +356,10 @@ def offset_theta_to_slope_intercept(
 
 
 def slope_intercept_to_points(m: float, b: float, w: int = 1, h: int = 1):
+    """
+    Convert slope-intercept form of line to two points.
+    """
+
     if m == np.inf:
         x_1, y_1 = b * h, 0
         x_2, y_2 = b * h, h
@@ -289,7 +369,9 @@ def slope_intercept_to_points(m: float, b: float, w: int = 1, h: int = 1):
     return (x_1, y_1), (x_2, y_2)
 
 
-def gaussian_curve_fit(softmax_data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4):
+def gaussian_curve_fit(
+    softmax_data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4
+):
     """
     Fit a gaussian to the softmax data to find peak.
     Returns the parameters of the gaussian: (A, mu, sigma)
@@ -301,7 +383,116 @@ def gaussian_curve_fit(softmax_data: np.ndarray, ftol: float = 1e-4, xtol: float
     # Initial guess for the parameters (amplitude, mean, std deviation)
     p0 = [softmax_data.max(), softmax_data.argmax() / softmax_data.shape[-1], 0.001]
     x = np.linspace(0, 1, softmax_data.shape[0], endpoint=False)
-    kwargs = {'ftol': ftol, 'xtol': xtol}
+    kwargs = {"ftol": ftol, "xtol": xtol}
 
     curve_params, _ = curve_fit(gaussian, x, softmax_data, p0=p0, **kwargs)
-    return curve_params # A, mu, sigma
+    return curve_params  # A, mu, sigma
+
+
+def postprocess_offset_theta(
+    offset: np.array,
+    theta: np.array,
+    orig_hw: tuple,
+    offset_buffer: float = 0.15,
+    do_curve_fit: bool = False,
+):
+    """
+    Get line points and score from offset and theta logits.
+
+    Parameters
+    ----------
+    offset : np.array
+        Offset vector (classification logits)
+    theta : np.array
+        Theta vector (classification logits)
+    orig_hw : tuple
+        Original image shape (height, width)
+    offset_buffer : float, optional
+        Buffer for offset-theta model
+    do_curve_fit : bool, optional
+        Whether to fit a gaussian curve to the softmax data
+
+    Returns
+    -------
+    (offset, theta): tuple
+        offset = (offset, offset_score)
+        theta = (theta, theta_score)
+    """
+
+    offset, theta = softmax(offset), softmax(theta)
+
+    if do_curve_fit:
+        offset_prob, offset, _ = gaussian_curve_fit(offset)
+        theta_prob, theta, _ = gaussian_curve_fit(theta)
+    else:
+        offset_prob, offset = offset.max(), offset.argmax() / len(offset)
+        theta_prob, theta = theta.max(), theta.argmax() / len(theta)
+
+    points = offset_theta_to_points(offset, theta, offset_buffer=offset_buffer)
+    points = np.array(points).flatten()
+    points = scale_boxes(points, (1, 1), orig_hw)
+    score = offset_prob * theta_prob  # pseudo-probability (because of softmax)
+
+    return points, score, -1
+
+
+def postprocess_ahoy(
+    output: tuple,
+    input_hw: tuple,
+    orig_hw: tuple,
+    conf_thresh: float,
+    iou_thresh: float,
+    offset_buffer: float = 0.15,
+    do_curve_fit: bool = True,
+) -> tuple:
+    """
+    Transform raw model output to application output.
+
+    Parameters
+    ----------
+    output : tuple
+        Raw model output.
+    input_hw : tuple
+        Input image shape (height, width)
+    orig_hw : tuple
+        Original image shape (height, width)
+    conf_thresh : float
+        Confidence threshold for p(bbox)
+        Predictions with score < conf are not considered as output.
+    iou_thresh : float
+        Minimum IOU to be counted as a duplicate detection.
+    offset_buffer : float, optional
+        Buffer for offset-theta model (only used if model has 3 outputs).
+
+    Returns
+    -------
+    List[np.ndarray]
+        Every element is a np.ndarray of shape (N, 6) where:
+        - N is the number of detected bounding boxes,
+        - first 4 are the coordinates of the bounding box,
+        - 5 is the confidence score of the bounding box,
+        - 6 is the class label of the detected bounding box.
+    """
+
+    preds = []  # store List[x1,y1,x2,y2,conf,cls] per batch
+
+    for det_logits in output[0]:
+        bboxes, confs, classes = postprocess_bboxes(
+            det_logits,
+            input_hw,
+            orig_hw,
+            conf_thresh=conf_thresh,
+            iou_thresh=iou_thresh,
+        )
+        preds.append(np.c_[bboxes, confs, classes])
+
+    if len(output) == 3:
+        # iterate over offset-theta outputs grouped by batch
+        for i, (offset_logits, theta_logits) in enumerate(zip(*output[1:])):
+            points, conf, cls = postprocess_offset_theta(
+                offset_logits, theta_logits, orig_hw, offset_buffer, do_curve_fit
+            )
+            # append hoizon line as a bbox (x1, y1, x2, y2)
+            preds[i] = np.r_[preds[i], np.r_[points, conf, cls].reshape(1, -1)]
+
+    return preds

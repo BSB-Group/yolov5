@@ -13,7 +13,7 @@ def transform_bboxes(preditcion: np.ndarray) -> np.ndarray:
     return preditcion
 
 
-class Yolo2TFLabel():
+class Yolo2TFLabel:
     def __init__(self, tf_category_idx: dict, yolo_label_path: str) -> None:
         """
         Initialize the Yolo2TFLabel conversion object.
@@ -27,12 +27,13 @@ class Yolo2TFLabel():
             Path to dictionary containing the label mapping of the Yolo model.
             Contains pairs in form (label_nr: label_str)
         """
-        tf_category_idx_rev = {s["name"]: n for n,
-                               s in tf_category_idx.items()}
+        tf_category_idx_rev = {s["name"]: n for n, s in tf_category_idx.items()}
         with open(yolo_label_path) as f:
             yolo_cls_map = json.load(f)  # pairs of (label_nr: label_str)
-            yolo2tf = {int(det): tf_category_idx_rev[label]
-                       for det, label in yolo_cls_map.items()}
+            yolo2tf = {
+                int(det): tf_category_idx_rev[label]
+                for det, label in yolo_cls_map.items()
+            }
             self.yolo2tf_lookup = np.vectorize(yolo2tf.get)
 
     def __call__(self, class_pred: np.ndarray) -> np.ndarray:
@@ -69,3 +70,32 @@ class Profile(contextlib.ContextDecorator):
 
     def time(self):
         return time.time()
+
+
+def yolov8_to_yolov5(model_output):
+    """Convert YOLOv8 output to YOLOv5 format.
+
+    Parameters
+    ----------
+    model_output : np.ndarray (4 + NC, N)
+        Where:
+        - N is the number of detected bounding boxes,
+        - 4 are the coordinates of the bounding box,
+        - NC is the number of classes.
+
+    Returns
+    -------
+    np.ndarray (N, 4 + 1 + NC)
+        Where:
+        - N is the number of detected bounding boxes,
+        - 4 are the coordinates of the bounding box,
+        - 1 is the confidence score of the bounding box,
+        - NC is the number of classes.
+    """
+    # (NC + 4, N) -> (N, NC + 4)
+    model_output = np.moveaxis(model_output, 0, 1)
+
+    bboxes = model_output[..., :4]
+    class_prob = model_output[..., 4:]
+    scores = np.max(class_prob, axis=1, keepdims=True)
+    return np.concatenate([bboxes, scores, class_prob], axis=1)
