@@ -2,7 +2,7 @@
 Abstract class for inference.
 """
 
-from typing import Union
+from typing import Union, List
 from abc import ABC, abstractmethod
 import numpy as np
 
@@ -14,7 +14,7 @@ class Infer(ABC):
 
     @property
     @abstractmethod
-    def input_shape(self) -> Union[tuple, list[tuple]]:
+    def input_shape(self) -> Union[tuple, List[tuple]]:
         """Return input(s) shape of the model."""
 
     @property
@@ -47,7 +47,7 @@ class Infer(ABC):
         """Return if model is using FP16 precision."""
 
     @abstractmethod
-    def forward(self, ims) -> Union[np.ndarray, list[np.ndarray]]:
+    def forward(self, ims) -> Union[np.ndarray, List[np.ndarray]]:
         """
         Run inference on batch of images.
 

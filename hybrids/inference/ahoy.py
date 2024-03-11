@@ -74,7 +74,7 @@ class AHOYv5:
         ims: np.ndarray,
         conf_thresh: float = 0.147,
         iou_thresh: float = 0.1,
-        curve_fit: bool = True,
+        do_curve_fit: bool = True,
         verbose: bool = False,
     ) -> np.ndarray:
         """
@@ -117,7 +117,7 @@ class AHOYv5:
                 orig_shape,
                 conf_thresh=conf_thresh,
                 iou_thresh=iou_thresh,
-                curve_fit=curve_fit,
+                do_curve_fit=do_curve_fit,
             )
 
         if verbose:
@@ -149,7 +149,7 @@ class AHOYv5:
         conf_thresh: float,
         iou_thresh: float,
         offset_buffer: float = 0.15,
-        curve_fit: bool = True,
+        do_curve_fit: bool = True,
     ) -> tuple:
         """
         Transform raw model output to application output.
@@ -185,17 +185,17 @@ class AHOYv5:
             conf_thresh,
             iou_thresh,
             offset_buffer,
-            curve_fit,
+            do_curve_fit,
         )
 
-    def predict(self, img, conf_thresh, iou_thresh, curve_fit=True):
+    def predict(self, img, conf_thresh, iou_thresh, do_curve_fit=True):
         """shortcut for detect() with output_mode="qa" """
         return self.detect(
             img,
             output_mode="qa",
             conf_thresh=conf_thresh,
             iou_thresh=iou_thresh,
-            curve_fit=curve_fit,
+            do_curve_fit=do_curve_fit,
         )
 
     def detect(
@@ -204,7 +204,7 @@ class AHOYv5:
         output_mode: Union[str, None] = None,
         conf_thresh: float = 0.147,
         iou_thresh: float = 0.1,
-        curve_fit: bool = True,
+        do_curve_fit: bool = True,
     ):
         """
         Parameters
@@ -248,7 +248,7 @@ class AHOYv5:
             assert all(im.ndim == 4 for im in ims), "All images must have 4 dimensions"
 
         orig_shape = ims[0].shape[:2]
-        dets = self(ims, conf_thresh, iou_thresh, curve_fit)
+        dets = self(ims, conf_thresh, iou_thresh, do_curve_fit)
         bboxes = np.array([det[:, :4] for det in dets])
         scores = np.array([det[:, 4] for det in dets])
         classes = np.array([det[:, 5] for det in dets])

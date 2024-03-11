@@ -130,15 +130,10 @@ def preprocess_yolo(
     )
     x = x.reshape(*input_hw, B, C).transpose((2, 3, 0, 1))  # BHWC to BCHW
     x = x.astype(np.float32) * (1 / 255.0)
-
-    try:
-        if fp16:
-            import torch
-            x = torch.tensor(x).half().numpy()
-    except ImportError:
-        # NOTE: converting to float16 is rather slow on numpy
-        # leave it to tensorrt to do the conversion or
-        # uncomment the following line to convert to float16
-        # x = x.astype(np.float16) if fp16 else x
-        pass
+    
+    # NOTE: converting to float16 is rather slow on numpy
+    # leave it to tensorrt to do the conversion or
+    # uncomment the following line to convert to float16
+    # x = x.astype(np.float16) if fp16 else x
+    
     return x

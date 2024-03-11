@@ -2,7 +2,7 @@
 Inference using TensorRT engine.
 """
 
-from typing import Union
+from typing import Union, List
 import numpy as np
 import tensorrt as trt
 import pycuda.driver as cuda
@@ -66,7 +66,7 @@ class InferTRT(Infer):
         """Return if model is using FP16 precision."""
         return np.all(inp.dtype == np.float16 for inp in self.inputs)
 
-    def check_input_shape(self, ims: Union[np.ndarray, list[np.ndarray]]) -> None:
+    def check_input_shape(self, ims: Union[np.ndarray, List[np.ndarray]]) -> None:
         """
         Check if input shape matches image shape.
 
@@ -85,7 +85,7 @@ class InferTRT(Infer):
             assert inp.shape == im.shape, msg
 
     def forward(
-        self, ims: Union[np.ndarray, list[np.ndarray]]
+        self, ims: Union[np.ndarray, List[np.ndarray]]
     ) -> Union[np.ndarray, list[np.ndarray]]:
         """
         Run inference on batch of images.

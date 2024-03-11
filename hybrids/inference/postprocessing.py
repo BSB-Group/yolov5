@@ -370,7 +370,7 @@ def slope_intercept_to_points(m: float, b: float, w: int = 1, h: int = 1):
 
 
 def gaussian_curve_fit(
-    softmax_data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4
+    data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4
 ):
     """
     Fit a gaussian to the softmax data to find peak.
@@ -381,11 +381,11 @@ def gaussian_curve_fit(
         return A * np.exp(-((x - mu) ** 2) / (2 * sigma**2))
 
     # Initial guess for the parameters (amplitude, mean, std deviation)
-    p0 = [softmax_data.max(), softmax_data.argmax() / softmax_data.shape[-1], 0.001]
-    x = np.linspace(0, 1, softmax_data.shape[0], endpoint=False)
+    p0 = [data.max(), data.argmax() / data.shape[-1], 0.001]
+    x = np.linspace(0, 1, data.shape[0], endpoint=False)
     kwargs = {"ftol": ftol, "xtol": xtol}
 
-    curve_params, _ = curve_fit(gaussian, x, softmax_data, p0=p0, **kwargs)
+    curve_params, _ = curve_fit(gaussian, x, data, p0=p0, **kwargs)
     return curve_params  # A, mu, sigma
 
 
@@ -428,6 +428,7 @@ def postprocess_offset_theta(
         offset_prob, offset = offset.max(), offset.argmax() / len(offset)
         theta_prob, theta = theta.max(), theta.argmax() / len(theta)
 
+    # offset, theta = 0.6859624508938708, 0.48873562950280525
     points = offset_theta_to_points(offset, theta, offset_buffer=offset_buffer)
     points = np.array(points).flatten()
     points = scale_boxes(points, (1, 1), orig_hw)
