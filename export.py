@@ -346,7 +346,7 @@ def export_coreml(model, im, file, int8, half, nms, prefix=colorstr("CoreML:")):
 @try_export
 def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr("TensorRT:")):
     # YOLOv5 TensorRT export https://developer.nvidia.com/tensorrt
-    if isinstance(im, tuple):
+    if isinstance(im, (list, tuple)):
         assert all(i.device.type != "cpu" for i in im), "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
     else:
         assert im.device.type != "cpu", "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"

@@ -10,7 +10,7 @@ TODO: add metadata to model file:
 
 import os
 import logging
-from typing import Union, List
+from typing import Union, Sequence
 from pathlib import Path
 import yaml
 import numpy as np
@@ -60,9 +60,11 @@ class DANv5:
             raise ValueError("Only TensorRT engines are supported.")
 
         cls_map_fpath = model_path.replace(".engine", ".yaml")
-        self.cls_map = (
-            load_labels(cls_map_fpath) if os.path.exists(cls_map_fpath) else None
-        )
+        if os.path.exists(cls_map_fpath):
+            self.cls_map = load_labels(cls_map_fpath)
+            logger.info(f"{self.cls_map=}")
+        else:
+            self.cls_map = None
 
         self.profiles = {
             "preprocess": Profile(),
@@ -72,29 +74,27 @@ class DANv5:
 
     def __call__(
         self,
-        ims_rgb: np.ndarray,
-        ims_ir: np.ndarray,
-        conf_thresh: Union[float, List[float]] = 0.147,
-        iou_thresh: Union[float, List[float]] = 0.1,
-        curve_fit: Union[bool, List[bool]] = True,
+        ims: Sequence[np.ndarray],
+        conf_thresh: Union[float, Sequence[float]] = 0.147,
+        iou_thresh: Union[float, Sequence[float]] = 0.1,
+        curve_fit: Union[bool, Sequence[bool]] = True,
         verbose: bool = False,
-    ) -> np.ndarray:
+    ) -> Sequence[Sequence[np.ndarray]]:
         """
         Run the entire model pipeline on the given input(s) image(s).
 
         Parameters
         ----------
-        img_rgb : np.ndarray
-            The input image(s) coming from the RGB camera.
-        ims_ir : np.ndarray
-            The input image(s) coming from the IR camera.
-        conf : float | list[float], optional
+        img: Sequence[np.ndarray]
+            The input image(s). If list, each element is an input to a multi-input 
+            model.
+        conf : float or Sequence[float], optional
             Confidence threshold for p(class). Predictions with score < conf_thresh
             are ignored. If single value, applies to all inputs.
-        iou_thresh : float | list[float], optional
+        iou_thresh : float or Sequence[float], optional
             Minimum IOU to be counted as a duplicate detection. If single value,
             applies to all inputs.
-        curve_fit : bool | list[bool], optional
+        curve_fit : bool or Sequence[bool], optional
             If True, uses curve fitting to get the offset and theta values.
             Applicable only for offset-theta model. If single value, applies to all
             inputs.
@@ -103,11 +103,13 @@ class DANv5:
 
         Returns
         -------
-        list[list[np.ndarray]]
-            x1, y1, x2, y2, score, class per image in batch per input.
+        Sequence[Sequence[np.ndarray]]
+            Outer sequence corresponds to each model's batch input.
+            Inner sequence corresponds to each sample in the batch.
+            Arrays are of size (N, 6), where N is the number of detected
+            bounding boxes, and 6 are the [x1,y1,x2,y2,score,class] per detection.
         """
 
-        ims = [ims_rgb, ims_ir]
         orig_shapes = [im.shape[-3:-1] for im in ims]  # (h, w)
 
         with self.profiles["preprocess"]:
@@ -131,7 +133,7 @@ class DANv5:
 
         return preds
 
-    def preprocess(self, ims: np.array) -> np.ndarray:
+    def preprocess(self, ims: Sequence[np.array]) -> Sequence[np.ndarray]:
         """
         Transform the input image so that the model can infer from it.
 
@@ -153,12 +155,12 @@ class DANv5:
     def postprocess(
         self,
         outputs: tuple,
-        orig_hws: List[tuple],
-        conf_thresh: Union[float, List[float]],
-        iou_thresh: Union[float, List[float]],
-        offset_buffer: Union[float, List[float]] = 0.15,
-        curve_fit: Union[bool, List[bool]] = True,
-    ) -> tuple:
+        orig_hws: Sequence[tuple],
+        conf_thresh: Union[float, Sequence[float]],
+        iou_thresh: Union[float, Sequence[float]],
+        offset_buffer: Union[float, Sequence[float]] = 0.15,
+        curve_fit: Union[bool, Sequence[bool]] = True,
+    ) -> Sequence[Sequence[np.ndarray]]:
         """
         Transform raw model output to application output.
 
@@ -166,34 +168,32 @@ class DANv5:
         ----------
         outputs : tuple
             Raw model output.
-        orig_hws : tuple | list[tuple]
+        orig_hws : tuple or Sequence[tuple]
             Original image shape (height, width)
-        conf_thresh : float | list[float]
+        conf_thresh : float or Sequence[float]
             Confidence threshold for p(bbox)
             Predictions with score < conf are not considered as output.
             If single value, applies to all inputs.
-        iou_thresh : float | list[float]
+        iou_thresh : float or Sequence[float]
             Minimum IOU to be counted as a duplicate detection.
             If single value, applies to all inputs.
-        offset_buffer : float | list[float]
+        offset_buffer : float or Sequence[float]
             Buffer for offset-theta model. If single value, applies to all inputs.
-        curve_fit : bool | list[bool]
+        curve_fit : bool or Sequence[bool]
             If True, uses curve fitting to get the offset and theta values.
             Applicable only for offset-theta model. If single value, applies to all
             inputs.
 
         Returns
         -------
-        List[List[np.ndarray]]
-            A list of np.ndarrays per input of the model.
-            Every np.ndarray has shape (N, 6) where:
-            - N is the number of detected bounding boxes,
-            - first 4 are the coordinates of the bounding box,
-            - 5 is the confidence score of the bounding box,
-            - 6 is the class label of the detected bounding box.
+        Sequence[Sequence[np.ndarray]]
+            Outer sequence corresponds to each model's batch input.
+            Inner sequence corresponds to each sample in the batch.
+            Arrays are of size (N, 6), where N is the number of detected
+            bounding boxes, and 6 are the [x1,y1,x2,y2,score,class] per detection.
         """
         n = len(outputs) // len(self.model.inputs)
-        grouped_outputs = [outputs[i : i + 3] for i in range(0, len(outputs), n)]
+        grouped_outputs = [outputs[i: i + 3] for i in range(0, len(outputs), n)]
 
         if not isinstance(conf_thresh, list):
             conf_thresh = [conf_thresh] * len(grouped_outputs)
@@ -302,4 +302,5 @@ class DANv5:
         return bboxes, scores, classes
 
     def close(self):
+        """Run this before exiting the program to free up resources."""
         self.model.close()

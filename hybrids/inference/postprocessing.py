@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Sequence
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.special import softmax
@@ -445,7 +445,7 @@ def postprocess_ahoy(
     iou_thresh: float,
     offset_buffer: float = 0.15,
     do_curve_fit: bool = True,
-) -> tuple:
+) -> Sequence[np.ndarray]:
     """
     Transform raw model output to application output.
 
@@ -467,7 +467,7 @@ def postprocess_ahoy(
 
     Returns
     -------
-    List[np.ndarray]
+    Sequence[np.ndarray]
         Every element is a np.ndarray of shape (N, 6) where:
         - N is the number of detected bounding boxes,
         - first 4 are the coordinates of the bounding box,

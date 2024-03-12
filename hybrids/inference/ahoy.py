@@ -8,7 +8,7 @@ TODO: add metadata to model file:
 
 import os
 import logging
-from typing import Union, List
+from typing import Union, Sequence, List
 from pathlib import Path
 import yaml
 import numpy as np
@@ -150,7 +150,7 @@ class AHOYv5:
         iou_thresh: float,
         offset_buffer: float = 0.15,
         do_curve_fit: bool = True,
-    ) -> tuple:
+    ) -> Sequence[np.ndarray]:
         """
         Transform raw model output to application output.
 
@@ -170,7 +170,7 @@ class AHOYv5:
 
         Returns
         -------
-        List[np.ndarray]
+        Sequence[np.ndarray]
             Every element is a np.ndarray of shape (N, 6) where:
             - N is the number of detected bounding boxes,
             - first 4 are the coordinates of the bounding box,
