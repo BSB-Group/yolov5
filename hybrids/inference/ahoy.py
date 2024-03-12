@@ -2,15 +2,13 @@
 AHOYv5 model for object and horizon detection.
 
 TODO: add metadata to model file:
-    - input_size
-    - half
     - offset_buffer (how offset is encoded in model)
     - classes_names
 """
 
 import os
 import logging
-from typing import Union
+from typing import Union, List
 from pathlib import Path
 import yaml
 import numpy as np
@@ -59,9 +57,11 @@ class AHOYv5:
             raise ValueError("Only TensorRT engines are supported.")
 
         cls_map_fpath = model_path.replace(".engine", ".yaml")
-        self.cls_map = (
-            load_labels(cls_map_fpath) if os.path.exists(cls_map_fpath) else None
-        )
+        if os.path.exists(cls_map_fpath):
+            self.cls_map = load_labels(cls_map_fpath)
+            logger.info(f"{self.cls_map=}")
+        else:
+            self.cls_map = None
 
         self.profiles = {
             "preprocess": Profile(),
@@ -235,7 +235,7 @@ class AHOYv5:
             Otherwise, returns (bboxes, scores, classes)
 
         - conf_thresh: float, optional
-            Confidence threshold for p(class). Predictions with score < conf are ignored.
+            Confidence threshold for p(class). Predictions with score<conf are ignored.
         - iou_thresh: float, optional
             Minimum IOU to be counted as a duplicate detection.
         - curve_fit: bool, optional
@@ -254,23 +254,39 @@ class AHOYv5:
         classes = np.array([det[:, 5] for det in dets])
 
         if output_mode == "tf":
-            bboxes = xyxy_to_xyxyn(bboxes, orig_shape)  # normalize to [0, 1]
-            bboxes = bboxes[:, [1, 0, 3, 2]]  # x1,y1,x2,y2 to y1,x1,y2,x2
-            return {
-                "detection_boxes": bboxes,
-                "detection_scores": scores,
-                "detection_classes": classes,
-                "num_detections": len(bboxes),
-            }
+            return self._to_tf(bboxes, scores, classes, orig_shape)
 
         if output_mode == "qa":
-            bboxes = xyxy_to_xyxyn(bboxes, orig_shape)  # normalize to [0, 1]
-            proposals = []
-            for bbox, score, cls in zip(bboxes, scores, classes):
-                proposals.append([bbox, self.cls_map[cls], score])
-            return proposals
+            return self._to_qa(bboxes, scores, classes, orig_shape, self.cls_map)
 
         return bboxes, scores, classes
 
+    @staticmethod
+    def _to_tf(bboxes, scores, classes, orig_shape) -> List[dict]:
+        proposals = []
+        for bbs, scs, cls in zip(bboxes, scores, classes):
+            bbs = xyxy_to_xyxyn(bbs, orig_shape)
+            bbs = bbs[:, [1, 0, 3, 2]]
+            proposals.append(
+                {
+                    "detection_boxes": bbs,
+                    "detection_scores": scs,
+                    "detection_classes": cls,
+                    "num_detections": len(bbs),
+                }
+            )
+        return proposals
+
+    @staticmethod
+    def _to_qa(bboxes, scores, classes, orig_shape, cls_map) -> List[List[list]]:
+        if not cls_map:
+            raise ValueError("Class mapping not found. Cannot convert to QA format.")
+        proposals = []
+        for bbs, scs, cls in zip(bboxes, scores, classes):
+            bbs = xyxy_to_xyxyn(bbs, orig_shape)
+            proposals.append([[b, cls_map[c], c, s] for b, s, c in zip(bbs, scs, cls)])
+        return proposals
+
     def close(self):
+        """Run this before exiting the program to free up resources."""
         self.model.close()

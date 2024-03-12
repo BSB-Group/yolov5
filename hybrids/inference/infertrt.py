@@ -86,7 +86,7 @@ class InferTRT(Infer):
 
     def forward(
         self, ims: Union[np.ndarray, List[np.ndarray]]
-    ) -> Union[np.ndarray, list[np.ndarray]]:
+    ) -> Union[np.ndarray, List[np.ndarray]]:
         """
         Run inference on batch of images.
 
