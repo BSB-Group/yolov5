@@ -80,6 +80,13 @@ def get_dummy_input(
     return dummy_input
 
 
+def get_engine_fname(model, batch_size, imgsz):
+    format_value = lambda x: "-".join(map(str, x)) if isinstance(x, list) else str(x)
+    bs_str = format_value(batch_size)
+    sz_str = format_value(imgsz)
+    return f"{type(model).__name__.lower()}_b{bs_str}_sz{sz_str}.engine"
+
+
 def main(
     det_weights: List[str],
     hor_weights: List[str],
@@ -87,17 +94,16 @@ def main(
     batch_size: List[int],
     half: bool,
     fuse: bool,
-    engine_fname: str = None,
+    engine_fname: str = "",
 ):
     """
     Export the model to TensorRT engine.
     """
 
     model = init_model(det_weights, hor_weights, half, fuse)
-    print(f"🚀 Exporting model {type(model).__name__} to {engine_fname}...")
-
     if not engine_fname:
-        engine_fname = f"{type(model).__name__.lower()}_b{batch_size}.engine"
+        engine_fname = get_engine_fname(model, batch_size, imgsz)
+    print(f"🚀 Exporting model {type(model).__name__} to {engine_fname}...")
 
     inplace = False  # default
     dynamic = False  # default
@@ -134,20 +140,57 @@ def main(
 
 def _parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--det-weights", nargs='+', type=str, required=True,
-                        help="List of paths to the detection model weights.")
-    parser.add_argument("--hor-weights", nargs='+', type=str, required=True,
-                        help="List of paths to the horizontal model weights.")
-    parser.add_argument("--imgsz", nargs='+', type=int, default=[640],
-                        help="Image sizes (width and height can be different).")
-    parser.add_argument("--batch-size", nargs='+', type=int, default=[1],
-                        help="Batch sizes for processing.")
-    parser.add_argument("--half", action="store_true",
-                        help="Use half precision (FP16) for inference.")
-    parser.add_argument("--fuse", action="store_true",
-                        help="Fuse convolution and batchnorm layers.")
-    parser.add_argument("--engine-fname", type=str, default="model.engine",
-                        help="Filename for the exported TensorRT engine.")
+    parser.add_argument(
+        "-dw",
+        "--det-weights",
+        nargs="+",
+        type=str,
+        required=True,
+        help="List of paths to the detection model weights.",
+    )
+    parser.add_argument(
+        "-hw",
+        "--hor-weights",
+        nargs="+",
+        type=str,
+        required=True,
+        help="List of paths to the horizontal model weights.",
+    )
+    parser.add_argument(
+        "-sz",
+        "--imgsz",
+        nargs="+",
+        type=int,
+        default=[640],
+        help="Image sizes (width and height can be different).",
+    )
+    parser.add_argument(
+        "-bs",
+        "--batch-size",
+        nargs="+",
+        type=int,
+        default=[1],
+        help="Batch sizes for processing.",
+    )
+    parser.add_argument(
+        "-hp",
+        "--half",
+        action="store_true",
+        help="Use half precision (FP16) for inference.",
+    )
+    parser.add_argument(
+        "-fu",
+        "--fuse",
+        action="store_true",
+        help="Fuse convolution and batchnorm layers.",
+    )
+    parser.add_argument(
+        "-ef",
+        "--engine-fname",
+        type=str,
+        default="",
+        help="Filename for the exported TensorRT engine.",
+    )
     return parser.parse_args()
 
 

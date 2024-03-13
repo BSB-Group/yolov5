@@ -70,15 +70,27 @@ def letterbox_image(
 def downscale_image_keeping_aspect_ratio(
     image: np.ndarray,
     desired_size: Tuple[int, int],
+    interpolation: int = cv2.INTER_LINEAR,
 ) -> np.ndarray:
+    """
+    Downscale the image to fit the desired size, preserving its aspect ratio.
+
+    Parameters:
+    - image: numpy array representing the image.
+    - desired_size: tuple (width, height) representing the target dimensions.
+    - interpolation: interpolation method to use.
+    """
     if image.shape[0] <= desired_size[1] and image.shape[1] <= desired_size[0]:
         return image
-    return resize_image_keeping_aspect_ratio(image=image, desired_size=desired_size)
+    return resize_image_keeping_aspect_ratio(
+        image=image, desired_size=desired_size, interpolation=interpolation
+    )
 
 
 def resize_image_keeping_aspect_ratio(
     image: np.ndarray,
     desired_size: Tuple[int, int],
+    interpolation: int = cv2.INTER_LINEAR,
 ) -> np.ndarray:
     """
     Resize reserving its aspect ratio.
@@ -86,7 +98,11 @@ def resize_image_keeping_aspect_ratio(
     Parameters:
     - image: numpy array representing the image.
     - desired_size: tuple (width, height) representing the target dimensions.
+    - interpolation: interpolation method to use.
     """
+    if max(desired_size) == max(image.shape[:2]):
+        return image
+
     img_ratio = image.shape[1] / image.shape[0]
     desired_ratio = desired_size[0] / desired_size[1]
 
@@ -101,7 +117,7 @@ def resize_image_keeping_aspect_ratio(
         new_width = int(desired_size[1] * img_ratio)
 
     # Resize the image to new dimensions
-    return cv2.resize(image, (new_width, new_height))
+    return cv2.resize(image, (new_width, new_height), interpolation=interpolation)
 
 
 def preprocess_yolo(
@@ -123,17 +139,65 @@ def preprocess_yolo(
         Preprocessed image.
     """
     ims = np.expand_dims(ims, axis=0) if ims.ndim == 3 else ims
-    B, H, W, C = ims.shape
-    x = letterbox_image(
-        ims.transpose(1, 2, 0, 3).reshape(H, W, B * C),  # letterbox all at once
-        desired_size=input_hw[::-1],
-    )
-    x = x.reshape(*input_hw, B, C).transpose((2, 3, 0, 1))  # BHWC to BCHW
+    x = np.stack([letterbox_image(im, input_hw) for im in ims], axis=0)
+    x = x.transpose(0, 3, 1, 2)  # NHWC -> NCHW
     x = x.astype(np.float32) * (1 / 255.0)
-    
+
     # NOTE: converting to float16 is rather slow on numpy
     # leave it to tensorrt to do the conversion or
     # uncomment the following line to convert to float16
-    # x = x.astype(np.float16) if fp16 else x
-    
+    x = x.astype(np.float16) if fp16 else x
+
     return x
+
+
+def resize_and_center_images_in_batch(
+    input_batch: np.ndarray, output_batch: np.ndarray
+):
+    """
+    Resize and center images from an input batch into a preallocated output batch array.
+
+    Parameters
+    ----------
+    input_batch : np.ndarray
+        The input batch of images with shape (N, H_in, W_in, C), where N is the batch
+        size, H_in and W_in are the height and width of the images, and C is the number
+        of channels.
+
+    output_batch : np.ndarray
+        The preallocated output batch array with shape (N, C, H_out, W_out), where
+        H_out and W_out are the target height and width. The array's contents will
+        be overwritten with the resized and centered images.
+
+    Returns
+    -------
+    None
+        The function modifies the output_batch in place and does not return a value.
+
+    Notes
+    -----
+    - Ensure that the output_batch is preallocated with the desired data type and
+      dimensions to avoid unintended behavior.
+    - Significant variation in input image dimensions may lead to visual artifacts in
+      the output_batch due to overlapping or incomplete coverage when pasting resized
+      images.
+    """
+
+    h_o, w_o = output_batch.shape[2], output_batch.shape[3]
+    input_batch = np.stack(
+        [downscale_image_keeping_aspect_ratio(im, (h_o, w_o)) for im in input_batch],
+        axis=0,
+    )
+
+    # Rearrange the dimensions
+    input_batch = input_batch.transpose(0, 3, 1, 2)  # NHWC -> NCHW
+    h, w = input_batch.shape[2], input_batch.shape[3]
+
+    # Calculate padding offsets for centering
+    pad_height = (h_o - h) // 2
+    pad_width = (w_o - w) // 2
+
+    # Paste the input_batch into the output_batch
+    output_batch[:, :, pad_height : pad_height + h, pad_width : pad_width + w] = (
+        input_batch.astype(output_batch.dtype)
+    )

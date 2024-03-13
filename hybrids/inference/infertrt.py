@@ -64,7 +64,7 @@ class InferTRT(Infer):
     @property
     def fp16(self) -> bool:
         """Return if model is using FP16 precision."""
-        return np.all(inp.dtype == np.float16 for inp in self.inputs)
+        return np.all([inp.dtype == np.float16 for inp in self.inputs])
 
     def check_input_shape(self, ims: Union[np.ndarray, List[np.ndarray]]) -> None:
         """

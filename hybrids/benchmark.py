@@ -53,7 +53,7 @@ def get_ahoy_model_and_input(engine_path: str) -> Tuple[AHOYv5, np.ndarray]:
     return ahoy, image
 
 
-def main(engine_path: str, dry_run: bool):
+def main(engine_path: str, n: int = 100, dry_run: bool = False):
     """
     Basic benchmarking of the AHOY and DAN models.
     """
@@ -70,8 +70,7 @@ def main(engine_path: str, dry_run: bool):
         model.model.forward(model.preprocess(images))
 
     if not dry_run:
-        print("benchmarking...")
-        n = 100
+        print(f"benchmarking over {n} iterations...")
         for _ in range(n):
             _ = model(images)
 
@@ -90,6 +89,9 @@ def _parse_args():
         type=str,
         required=True,
         help="Path to the TensorRT engine file",
+    )
+    parser.add_argument(
+        "-n", type=int, default=100, help="Number of iterations to benchmark"
     )
     parser.add_argument("--dry-run", action="store_true", help="Dry run")
     return parser.parse_args()
