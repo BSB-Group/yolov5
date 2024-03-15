@@ -18,6 +18,16 @@ class Infer(ABC):
         """Return input(s) shape of the model."""
 
     @property
+    @abstractmethod
+    def dtype(self) -> np.dtype:
+        """Return data type of the model."""
+
+    @property
+    @abstractmethod
+    def fp16(self) -> bool:
+        """Return if model is using FP16 precision."""
+
+    @property
     def input_hw(self) -> tuple:
         """Return input(s) height and width of the model."""
         shapes = self.input_shape
@@ -41,10 +51,20 @@ class Infer(ABC):
             return [shape[0] for shape in shapes]
         return shapes[0]
 
+    _alloc_arrays = None
+
     @property
-    @abstractmethod
-    def fp16(self) -> bool:
-        """Return if model is using FP16 precision."""
+    def alloc_arrays(self) -> List[np.ndarray]:
+        """Return list of arrays to allocate memory for multiple usage."""
+        if self._alloc_arrays is None:
+            if isinstance(self.input_shape, list):
+                self._alloc_arrays = [
+                    np.zeros(shape, dtype=dtype)
+                    for dtype, shape in zip(self.dtype, self.input_shape)
+                ]
+            else:
+                self._alloc_arrays = np.zeros(self.input_shape, dtype=self.dtype)
+        return self._alloc_arrays
 
     @abstractmethod
     def forward(self, ims) -> Union[np.ndarray, List[np.ndarray]]:

@@ -15,7 +15,7 @@ import numpy as np
 
 # import pycuda.autoinit  # cuda context initialized manually in __init__
 
-from .preprocessing import preprocess_yolo
+from .preprocessing import preprocess_yolo, resize_and_center_images_in_batch
 from .postprocessing import xyxy_to_xyxyn, postprocess_ahoy
 from .misc import Profile
 
@@ -125,7 +125,7 @@ class AHOYv5:
                 print(f"{profile.dt * 1E3:>5.1f} ms - {name}")
 
         return preds
-
+    
     def preprocess(self, ims: np.array) -> np.ndarray:
         """
         Transform the input image so that the model can infer from it.
@@ -140,7 +140,41 @@ class AHOYv5:
         np.ndarray
             Preprocessed image.
         """
+        return self.preprocess_fast(ims)
+
+    def preprocess_yolo(self, ims: np.array) -> np.ndarray:
+        """
+        Transform the input image so that the model can infer from it.
+
+        Parameters
+        ----------
+        ims : np.ndarray
+            The input image(s)
+
+        Returns
+        -------
+        np.ndarray
+            Preprocessed image.
+        """
         return preprocess_yolo(ims, self.model.input_hw, self.model.fp16)
+
+    def preprocess_fast(self, ims: np.array) -> np.ndarray:
+        """
+        Transform the input image so that the model can infer from it.
+        This runs under the assumption that input images have a constant size
+        throughout the pipeline.
+
+        Parameters
+        ----------
+        ims : np.ndarray
+            The input image(s)
+
+        Returns
+        -------
+        np.ndarray
+            Preprocessed image.
+        """
+        return resize_and_center_images_in_batch(ims, self.model.alloc_arrays)
 
     def postprocess(
         self,

@@ -191,13 +191,16 @@ def resize_and_center_images_in_batch(
 
     # Rearrange the dimensions
     input_batch = input_batch.transpose(0, 3, 1, 2)  # NHWC -> NCHW
-    h, w = input_batch.shape[2], input_batch.shape[3]
+    input_batch = input_batch.astype(np.float32) * (1 / 255.0)
 
     # Calculate padding offsets for centering
+    h, w = input_batch.shape[2], input_batch.shape[3]
     pad_height = (h_o - h) // 2
     pad_width = (w_o - w) // 2
 
     # Paste the input_batch into the output_batch
-    output_batch[:, :, pad_height : pad_height + h, pad_width : pad_width + w] = (
+    output_batch[:, :, pad_height: pad_height + h, pad_width: pad_width + w] = (
         input_batch.astype(output_batch.dtype)
     )
+
+    return output_batch

@@ -48,11 +48,6 @@ class InferTRT(Infer):
         for i, inp in enumerate(self.inputs):
             print(f" - Input {i}: shape {inp.shape}, dtype {inp.dtype}")
 
-        # # Allocate memory for multiple usage [e.g. multiple batch inference]
-        # input_volume = trt.volume(ModelData.INPUT_SHAPE)
-        # self.numpy_array = np.zeros(
-        #     (self.trt_engine.max_batch_size, input_volume))
-
     @property
     def input_shape(self) -> tuple:
         """Return input(s) shape of the model."""
@@ -60,6 +55,14 @@ class InferTRT(Infer):
         if len(shapes) == 1:
             return shapes[0]
         return shapes
+
+    @property
+    def dtype(self) -> np.dtype:
+        """Return data type of the model."""
+        dtypes = [inp.dtype for inp in self.inputs]
+        if len(dtypes) == 1:
+            return dtypes[0]
+        return dtypes
 
     @property
     def fp16(self) -> bool:
