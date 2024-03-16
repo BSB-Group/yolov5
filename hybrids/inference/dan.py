@@ -17,9 +17,10 @@ import numpy as np
 
 # import pycuda.autoinit  # cuda context initialized manually in __init__
 
-from .preprocessing import preprocess_yolo
-from .postprocessing import xyxy_to_xyxyn, postprocess_ahoy
+from .preprocessing import preprocess_yolo, resize_and_center_images_in_batch
+from .postprocessing import postprocess_ahoy
 from .misc import Profile
+from .ahoy import AHOYv5
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class DANv5:
         Parameters
         ----------
         img: Sequence[np.ndarray]
-            The input image(s). If list, each element is an input to a multi-input 
+            The input image(s). If list, each element is an input to a multi-input
             model.
         conf : float or Sequence[float], optional
             Confidence threshold for p(class). Predictions with score < conf_thresh
@@ -133,7 +134,23 @@ class DANv5:
 
         return preds
 
-    def preprocess(self, ims: Sequence[np.array]) -> Sequence[np.ndarray]:
+    def preprocess(self, ims: np.array) -> np.ndarray:
+        """
+        Transform the input image so that the model can infer from it.
+
+        Parameters
+        ----------
+        ims : np.ndarray
+            The input image(s)
+
+        Returns
+        -------
+        np.ndarray
+            Preprocessed image.
+        """
+        return self.preprocess_fast(ims)
+
+    def preprocess_yolo(self, ims: Sequence[np.array]) -> Sequence[np.ndarray]:
         """
         Transform the input image so that the model can infer from it.
 
@@ -150,6 +167,27 @@ class DANv5:
         return [
             preprocess_yolo(im, input_hw, self.model.fp16)
             for input_hw, im in zip(self.model.input_hw, ims)
+        ]
+
+    def preprocess_fast(self, ims: Sequence[np.array]) -> Sequence[np.ndarray]:
+        """
+        Transform the input image so that the model can infer from it.
+        This runs under the assumption that input images have a constant size
+        throughout the pipeline.
+
+        Parameters
+        ----------
+        ims : np.ndarray
+            The input image(s)
+
+        Returns
+        -------
+        np.ndarray
+            Preprocessed image.
+        """
+        return [
+            resize_and_center_images_in_batch(im, alloc_array)
+            for im, alloc_array in zip(ims, self.model.alloc_arrays)
         ]
 
     def postprocess(
@@ -217,14 +255,14 @@ class DANv5:
             )
         ]
 
-    def predict(self, img, conf_thresh, iou_thresh, curve_fit=True):
+    def predict(self, img, conf_thresh, iou_thresh, do_curve_fit=True):
         """shortcut for detect() with output_mode="qa" """
         return self.detect(
             img,
             output_mode="qa",
             conf_thresh=conf_thresh,
             iou_thresh=iou_thresh,
-            curve_fit=curve_fit,
+            do_curve_fit=do_curve_fit,
         )
 
     def detect(
@@ -233,7 +271,7 @@ class DANv5:
         output_mode: Union[str, None] = None,
         conf_thresh: float = 0.147,
         iou_thresh: float = 0.1,
-        curve_fit: bool = True,
+        do_curve_fit: bool = True,
     ):
         """
         Parameters
@@ -264,7 +302,7 @@ class DANv5:
             Otherwise, returns (bboxes, scores, classes)
 
         - conf_thresh: float, optional
-            Confidence threshold for p(class). Predictions with score < conf are ignored.
+            Confidence threshold for p(class). Predictions with score<conf are ignored.
         - iou_thresh: float, optional
             Minimum IOU to be counted as a duplicate detection.
         - curve_fit: bool, optional
@@ -276,30 +314,13 @@ class DANv5:
         elif isinstance(ims, (list, tuple)):
             assert all(im.ndim == 4 for im in ims), "All images must have 4 dimensions"
 
-        orig_shape = ims[0].shape[:2]
-        dets = self(ims, conf_thresh, iou_thresh, curve_fit)
-        bboxes = np.array([det[:, :4] for det in dets])
-        scores = np.array([det[:, 4] for det in dets])
-        classes = np.array([det[:, 5] for det in dets])
+        orig_shapes = [im.shape[-3:-1] for im in ims]
+        outputs_dets = self(ims, conf_thresh, iou_thresh, do_curve_fit)
 
-        if output_mode == "tf":
-            bboxes = xyxy_to_xyxyn(bboxes, orig_shape)  # normalize to [0, 1]
-            bboxes = bboxes[:, [1, 0, 3, 2]]  # x1,y1,x2,y2 to y1,x1,y2,x2
-            return {
-                "detection_boxes": bboxes,
-                "detection_scores": scores,
-                "detection_classes": classes,
-                "num_detections": len(bboxes),
-            }
-
-        if output_mode == "qa":
-            bboxes = xyxy_to_xyxyn(bboxes, orig_shape)  # normalize to [0, 1]
-            proposals = []
-            for bbox, score, cls in zip(bboxes, scores, classes):
-                proposals.append([bbox, self.cls_map[cls], score])
-            return proposals
-
-        return bboxes, scores, classes
+        return [
+            AHOYv5.to_mode(dets, output_mode, orig_shape, self.cls_map)
+            for dets, orig_shape in zip(outputs_dets, orig_shapes)
+        ]
 
     def close(self):
         """Run this before exiting the program to free up resources."""

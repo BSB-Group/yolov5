@@ -152,7 +152,7 @@ def preprocess_yolo(
 
 
 def resize_and_center_images_in_batch(
-    input_batch: np.ndarray, output_batch: np.ndarray
+    input_batch: np.ndarray, output_batch: np.ndarray, to_dtype: bool = False
 ):
     """
     Resize and center images from an input batch into a preallocated output batch array.
@@ -200,7 +200,7 @@ def resize_and_center_images_in_batch(
 
     # Paste the input_batch into the output_batch
     output_batch[:, :, pad_height: pad_height + h, pad_width: pad_width + w] = (
-        input_batch.astype(output_batch.dtype)
+        input_batch
     )
 
     return output_batch

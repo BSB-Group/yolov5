@@ -125,7 +125,7 @@ class AHOYv5:
                 print(f"{profile.dt * 1E3:>5.1f} ms - {name}")
 
         return preds
-    
+
     def preprocess(self, ims: np.array) -> np.ndarray:
         """
         Transform the input image so that the model can infer from it.
@@ -145,6 +145,7 @@ class AHOYv5:
     def preprocess_yolo(self, ims: np.array) -> np.ndarray:
         """
         Transform the input image so that the model can infer from it.
+        Letterbox, 0-1 normalization, and NHWC to NCHW conversion.
 
         Parameters
         ----------
@@ -283,20 +284,26 @@ class AHOYv5:
 
         orig_shape = ims[0].shape[:2]
         dets = self(ims, conf_thresh, iou_thresh, do_curve_fit)
+        return self.to_mode(dets, output_mode, orig_shape, self.cls_map)
+
+    @staticmethod
+    def to_mode(dets, output_mode, orig_shape, cls_map):
+        """Convert detections to desired output mode."""
         bboxes = np.array([det[:, :4] for det in dets])
         scores = np.array([det[:, 4] for det in dets])
         classes = np.array([det[:, 5] for det in dets])
 
         if output_mode == "tf":
-            return self._to_tf(bboxes, scores, classes, orig_shape)
+            return AHOYv5.to_tf(bboxes, scores, classes, orig_shape)
 
         if output_mode == "qa":
-            return self._to_qa(bboxes, scores, classes, orig_shape, self.cls_map)
+            return AHOYv5.to_qa(bboxes, scores, classes, orig_shape, cls_map)
 
         return bboxes, scores, classes
 
     @staticmethod
-    def _to_tf(bboxes, scores, classes, orig_shape) -> List[dict]:
+    def to_tf(bboxes, scores, classes, orig_shape) -> List[dict]:
+        """To Tensorflow Object Detection API format."""
         proposals = []
         for bbs, scs, cls in zip(bboxes, scores, classes):
             bbs = xyxy_to_xyxyn(bbs, orig_shape)
@@ -312,7 +319,8 @@ class AHOYv5:
         return proposals
 
     @staticmethod
-    def _to_qa(bboxes, scores, classes, orig_shape, cls_map) -> List[List[list]]:
+    def to_qa(bboxes, scores, classes, orig_shape, cls_map) -> List[List[list]]:
+        """To QA format."""
         if not cls_map:
             raise ValueError("Class mapping not found. Cannot convert to QA format.")
         proposals = []
