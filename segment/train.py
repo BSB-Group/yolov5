@@ -254,6 +254,7 @@ def train(hyp, opt, device, callbacks):
         rank=LOCAL_RANK,
         workers=workers,
         image_weights=opt.image_weights,
+        close_mosaic=opt.close_mosaic != 0,
         quad=opt.quad,
         prefix=colorstr("train: "),
         shuffle=True,
@@ -335,6 +336,9 @@ def train(hyp, opt, device, callbacks):
             cw = model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc  # class weights
             iw = labels_to_image_weights(dataset.labels, nc=nc, class_weights=cw)  # image weights
             dataset.indices = random.choices(range(dataset.n), weights=iw, k=dataset.n)  # rand weighted idx
+        if epoch == (epochs - opt.close_mosaic):
+            LOGGER.info("Closing dataloader mosaic")
+            dataset.mosaic = False
 
         # Update mosaic border (optional)
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
@@ -577,6 +581,9 @@ def parse_opt(known=False):
     parser.add_argument("--save-period", type=int, default=-1, help="Save checkpoint every x epochs (disabled if < 1)")
     parser.add_argument("--seed", type=int, default=0, help="Global training seed")
     parser.add_argument("--local_rank", type=int, default=-1, help="Automatic DDP Multi-GPU argument, do not modify")
+
+    # close mosaic (a value between 10 and 15 seems to work fine)
+    parser.add_argument("--close-mosaic", type=int, default=0, help="Close mosaic after x epochs")
 
     # Instance Segmentation Args
     parser.add_argument("--mask-ratio", type=int, default=4, help="Downsample the truth masks to saving memory")
