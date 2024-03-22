@@ -583,7 +583,7 @@ def parse_opt(known=False):
     parser.add_argument("--local_rank", type=int, default=-1, help="Automatic DDP Multi-GPU argument, do not modify")
 
     # close mosaic (a value between 10 and 15 seems to work fine)
-    parser.add_argument("--close-mosaic", type=int, default=0, help="Close mosaic after x epochs")
+    parser.add_argument("--close-mosaic", type=int, default=0, help="Close mosaic N epochs before end. 0 to disable")
 
     # Instance Segmentation Args
     parser.add_argument("--mask-ratio", type=int, default=4, help="Downsample the truth masks to saving memory")
