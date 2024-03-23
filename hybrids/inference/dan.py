@@ -61,27 +61,32 @@ class DANv5:
         else:
             raise ValueError("Only TensorRT engines are supported.")
 
-        cls_maps_fpath = model_path.replace(".engine", ".yaml")
         self.cls_maps = None
         self.label_encoder = None
-        if os.path.exists(cls_maps_fpath):
-            self.cls_maps = load_labels(cls_maps_fpath)
-            if isinstance(self.cls_maps, list):
-                self.label_encoder = LabelEncoder()
-                self.label_encoder.fit(
-                    list({v for cls_map in self.cls_maps for v in cls_map.values()})
-                )
-            else:
-                # assume both outputs have same mapping
-                self.cls_maps = [self.cls_maps] * len(self.model.inputs)
-                self.label_encoder = None
-            logger.info(f"{self.cls_maps}")
+        self.init_cls_maps(model_path.replace(".engine", ".yaml"))
 
         self.profiles = {
             "preprocess": Profile(),
             "inference": Profile(),
             "postprocess": Profile(),
         }
+
+    def init_cls_maps(self, cls_maps_fpath: str):
+        """Load class maps from file."""
+        if not os.path.exists(cls_maps_fpath):
+            return
+
+        self.cls_maps = load_labels(cls_maps_fpath)
+        if isinstance(self.cls_maps, list):
+            self.label_encoder = LabelEncoder()
+            self.label_encoder.fit(
+                list({v for cls_map in self.cls_maps for v in cls_map.values()})
+            )
+        else:
+            # assume both outputs have same mapping
+            self.cls_maps = [self.cls_maps] * len(self.model.inputs)
+            self.label_encoder = None
+        logger.info(f"{self.cls_maps}")
 
     @staticmethod
     def get_label2id_map(cls_maps: List[Dict]):
