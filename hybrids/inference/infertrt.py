@@ -35,7 +35,7 @@ class InferTRT(Infer):
 
         # Display requested engine settings to stdout
         print(f"Loading TensorRT inference engine {trt_engine_path}")
-        self.trt_engine = load_engine(trt_engine_path, TRT_LOGGER)
+        self.trt_engine = self.load_model(trt_engine_path)
 
         # Execution context is needed for inference
         self.context = self.trt_engine.create_execution_context()
@@ -47,6 +47,17 @@ class InferTRT(Infer):
 
         for i, inp in enumerate(self.inputs):
             print(f" - Input {i}: shape {inp.shape}, dtype {inp.dtype}")
+
+    def load_model(self, model_path: str):
+        """
+        Load model from file.
+
+        Parameters
+        ----------
+        model_path : str
+            Path to the model file.
+        """
+        return load_engine(model_path, TRT_LOGGER)
 
     @property
     def input_shape(self) -> tuple:
@@ -143,6 +154,10 @@ class InferTRT(Infer):
 
         # And return results
         return detection_outs
+
+    def detect(self, ims, **kwargs) -> List:
+        """To be implemented by subclasses."""
+        raise NotImplementedError("Method should be implemented by subclass.")
 
     def close(self):
         """Free CUDA memory and detach context."""

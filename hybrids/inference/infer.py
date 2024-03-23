@@ -12,6 +12,10 @@ class Infer(ABC):
     Abstract class for inference.
     """
 
+    @abstractmethod
+    def load_model(self, model_path: str):
+        """Load a model from file."""
+
     @property
     @abstractmethod
     def input_shape(self) -> Union[tuple, List[tuple]]:
@@ -80,4 +84,12 @@ class Infer(ABC):
         -------
         np.ndarray | list[np.ndarray]
             Model outputs.
+        """
+
+    @abstractmethod
+    def detect(self, ims, **kwargs) -> list:
+        """
+        Run inference on batch of images and return detections as list::
+
+        [[[x1, y1, x2, y2], class_name, class_id, score], ...]
         """

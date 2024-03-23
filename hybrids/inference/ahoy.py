@@ -59,7 +59,7 @@ class AHOYv5:
         cls_map_fpath = model_path.replace(".engine", ".yaml")
         if os.path.exists(cls_map_fpath):
             self.cls_map = load_labels(cls_map_fpath)
-            logger.info(f"{self.cls_map=}")
+            logger.info(f"{self.cls_map}")
         else:
             self.cls_map = None
 
@@ -89,7 +89,7 @@ class AHOYv5:
             are ignored.
         iou_thresh : float, optional
             Minimum IOU to be counted as a duplicate detection.
-        curve_fit : bool, optional
+        do_curve_fit : bool, optional
             If True, uses curve fitting to get the offset and theta values.
             Applicable only for offset-theta model.
         verbose : bool, optional
@@ -236,10 +236,10 @@ class AHOYv5:
     def detect(
         self,
         ims: np.ndarray,
-        output_mode: Union[str, None] = None,
+        output_mode: Union[str, None] = "qa",
         conf_thresh: float = 0.147,
         iou_thresh: float = 0.1,
-        do_curve_fit: bool = True,
+        do_curve_fit: bool = False,
     ):
         """
         Parameters
@@ -247,7 +247,7 @@ class AHOYv5:
 
         - ims: np.ndarray
             The input image(s).
-        - output_mode: str, optional
+        - output_mode: str, default "qa"
             If "tf", returns format expected by Tensorflow Object Detection API::
 
                 return {
@@ -259,13 +259,7 @@ class AHOYv5:
 
             If "qa", returns format expected by the QA system::
 
-                for bbox, score, cls in zip(bboxes, scores, classes):
-                    proposals.append([
-                        bbox,
-                        self.cls_map[cls],
-                        score
-                    ])
-                return proposals
+                return [[[x1, y1, x2, y2], class_name, class_id, score], ...]
 
             Otherwise, returns (bboxes, scores, classes)
 
@@ -273,7 +267,7 @@ class AHOYv5:
             Confidence threshold for p(class). Predictions with score<conf are ignored.
         - iou_thresh: float, optional
             Minimum IOU to be counted as a duplicate detection.
-        - curve_fit: bool, optional
+        - do_curve_fit: bool, optional
             If True, uses curve fitting to get the offset and theta values.
             Applicable only for offset-theta model.
         """
@@ -320,13 +314,18 @@ class AHOYv5:
 
     @staticmethod
     def to_qa(bboxes, scores, classes, orig_shape, cls_map) -> List[List[list]]:
-        """To QA format."""
+        """
+        Named 'qa' for some historical reason since the QA department used this format.
+        Format is [[[x1, y1, x2, y2], class_name, class_id, score], ...]
+        """
         if not cls_map:
             raise ValueError("Class mapping not found. Cannot convert to QA format.")
         proposals = []
         for bbs, scs, cls in zip(bboxes, scores, classes):
             bbs = xyxy_to_xyxyn(bbs, orig_shape)
-            proposals.append([[b, cls_map[c], c, s] for b, s, c in zip(bbs, scs, cls)])
+            proposals.append(
+                [[b, cls_map[c], int(c), s] for b, s, c in zip(bbs, scs, cls)]
+            )
         return proposals
 
     def close(self):
