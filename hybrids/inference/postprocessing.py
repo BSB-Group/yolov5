@@ -1,3 +1,8 @@
+"""
+Collection of postprocessing functions for object detection models.
+Most functions are designed to work with NumPy arrays.
+"""
+
 from typing import Tuple, Sequence
 import numpy as np
 from scipy.optimize import curve_fit
@@ -17,7 +22,7 @@ def cxcywh_to_xyxy(bboxes: np.ndarray) -> np.ndarray:
     Returns
     -------
     np.ndarray (N, 4)
-        bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     """
     center_x, center_y, width, height = bboxes.T
     top_left_x = center_x - width / 2
@@ -30,13 +35,13 @@ def cxcywh_to_xyxy(bboxes: np.ndarray) -> np.ndarray:
 
 def xyxy_to_xywh(bboxes: np.ndarray) -> np.ndarray:
     """
-    Convert bounding boxes from (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
-    to (center_x, center_y, width, height) format.
+    Convert bounding boxes from (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
+    to (center_x, center_y, width, height).
 
     Parameters
     ----------
     bboxes : np.ndarray (N, 4)
-        bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
 
     Returns
     -------
@@ -51,8 +56,8 @@ def xyxy_to_xywh(bboxes: np.ndarray) -> np.ndarray:
 
 def xyxy_to_xyxyn(bboxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     """
-    Convert bounding boxes in form of (x, y, x, y) from absolute pixels to relative pixels
-    in range [0, 1] with respect to certain shape.
+    Convert bounding boxes in form of (x, y, x, y) from absolute pixels to relative
+    pixels in range [0, 1] with respect to certain shape.
 
     Parameters
     ----------
@@ -95,27 +100,35 @@ def xyxyn_to_xyxy(bboxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     return bboxes
 
 
-def scale_boxes(bboxes, from_shape, to_shape):
+def scale_boxes(
+    bboxes: np.ndarray,
+    from_shape: Tuple[int, int],
+    to_shape: Tuple[int, int],
+    only_downscale: bool = False,
+) -> np.ndarray:
     """
     Rescale bounding boxes from from_shape to to_shape
 
     Parameters
     ----------
     bboxes : np.ndarray (N, 4)
-        bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     from_shape : tuple (2,)
         original shape of the image (height, width)
     to_shape : tuple (2,)
         target shape of the image (height, width)
+    only_downscale : bool, optional
+        whether to only downscale the boxes
 
     Returns
     -------
     np.ndarray (N, 4)
-        bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     """
 
     # gain  = old / new
     gain = min(from_shape[0] / to_shape[0], from_shape[1] / to_shape[1])
+    gain = min(gain, 1) if only_downscale else gain
     # wh padding
     pad = (
         (from_shape[1] - to_shape[1] * gain) / 2,  # x padding
@@ -142,14 +155,14 @@ def intersection_box(target_box: np.ndarray, boxes: np.ndarray) -> list:
     Parameters
     ----------
     target_box : np.ndarray (4,)
-        bounding box in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding box as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     boxes : np.ndarray (N, 4)
-        bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
 
     Returns
     -------
     np.ndarray (N, 4)
-        intersection bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        intersection bboxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     """
     x1, y1, x2, y2 = target_box
     a1, b1, a2, b2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
@@ -186,9 +199,9 @@ def iou(
     Parameters
     ----------
     target_box : np.ndarray (4,)
-        bounding box in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding box as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     boxes : np.ndarray (N, 4)
-        bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     target_area : np.ndarray (1,)
         area of target box
     areas : np.ndarray (N,)
@@ -215,7 +228,7 @@ def nms(
     Parameters
     ----------
     bboxes : np.ndarray (N, 4)
-        bounding boxes in (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     scores : np.ndarray (N,)
         confidence scores for each bounding box
     iou_thresh : float
@@ -254,7 +267,7 @@ def nms(
     return keep
 
 
-def postprocess_bboxes(
+def postprocess_yolo(
     model_output: np.ndarray,
     input_hw: tuple,
     orig_hw: tuple,
@@ -316,7 +329,7 @@ def postprocess_bboxes(
     classes = classes[keep]
     scores = scores[keep]
 
-    bboxes = scale_boxes(bboxes, input_hw, orig_hw)
+    bboxes = scale_boxes(bboxes, input_hw, orig_hw, only_downscale=True)
     return bboxes, scores, classes
 
 
@@ -369,9 +382,7 @@ def slope_intercept_to_points(m: float, b: float, w: int = 1, h: int = 1):
     return (x_1, y_1), (x_2, y_2)
 
 
-def gaussian_curve_fit(
-    data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4
-):
+def gaussian_curve_fit(data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4):
     """
     Fit a gaussian to the softmax data to find peak.
     Returns the parameters of the gaussian: (A, mu, sigma)
@@ -478,7 +489,7 @@ def postprocess_ahoy(
     preds = []  # store List[x1,y1,x2,y2,conf,cls] per batch
 
     for det_logits in output[0]:
-        bboxes, confs, classes = postprocess_bboxes(
+        bboxes, confs, classes = postprocess_yolo(
             det_logits,
             input_hw,
             orig_hw,
@@ -487,13 +498,12 @@ def postprocess_ahoy(
         )
         preds.append(np.c_[bboxes, confs, classes])
 
-    if len(output) == 3:
-        # iterate over offset-theta outputs grouped by batch
-        for i, (offset_logits, theta_logits) in enumerate(zip(*output[1:])):
-            points, conf, cls = postprocess_offset_theta(
-                offset_logits, theta_logits, orig_hw, offset_buffer, do_curve_fit
-            )
-            # append hoizon line as a bbox (x1, y1, x2, y2)
-            preds[i] = np.r_[preds[i], np.r_[points, conf, cls].reshape(1, -1)]
+    # iterate over offset-theta outputs grouped by batch
+    for i, (offset_logits, theta_logits) in enumerate(zip(*output[1:])):
+        points, conf, cls = postprocess_offset_theta(
+            offset_logits, theta_logits, orig_hw, offset_buffer, do_curve_fit
+        )
+        # append hoizon line as a bbox (x1, y1, x2, y2)
+        preds[i] = np.r_[preds[i], np.r_[points, conf, cls].reshape(1, -1)]
 
     return preds

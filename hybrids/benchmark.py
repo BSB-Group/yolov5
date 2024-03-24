@@ -65,10 +65,6 @@ def main(engine_path: str, n: int = 100, dry_run: bool = False):
     else:
         raise ValueError("Cannot determine model type from engine path.")
 
-    print("warming up...")
-    for _ in range(10):
-        model.model.forward(model.preprocess(images))
-
     if not dry_run:
         print(f"benchmarking over {n} iterations...")
         for _ in range(n):

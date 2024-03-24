@@ -331,10 +331,10 @@ class DANv5:
             If True, uses curve fitting to get the offset and theta values.
             Applicable only for offset-theta model.
         """
-        if isinstance(ims, np.ndarray):
-            assert ims.ndim == 4, "Input image must have 3 dimensions (b, h, w, c)"
-        elif isinstance(ims, (list, tuple)):
-            assert all(im.ndim == 4 for im in ims), "All images must have 4 dimensions"
+        if isinstance(ims, (list, tuple)):
+            assert all(im.ndim == 4 for im in ims), "All inputs must have 4 dimensions"
+        else:
+            raise ValueError(f"Input must be a list or tuple. Got: {type(ims)}")
 
         orig_shapes = [im.shape[-3:-1] for im in ims]
         outputs_dets = self(ims, conf_thresh, iou_thresh, do_curve_fit)

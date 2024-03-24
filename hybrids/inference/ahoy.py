@@ -272,20 +272,20 @@ class AHOYv5:
             Applicable only for offset-theta model.
         """
         if isinstance(ims, np.ndarray):
-            assert ims.ndim == 4, "Input image must have 3 dimensions (b, h, w, c)"
-        elif isinstance(ims, (list, tuple)):
-            assert all(im.ndim == 4 for im in ims), "All images must have 4 dimensions"
+            assert ims.ndim == 4, "Input must have 4 dimensions (b, h, w, c)"
+        else:
+            raise ValueError("Input must be a numpy array. Got: ", type(ims))
 
-        orig_shape = ims[0].shape[:2]
+        orig_shape = ims.shape[-3:-1]  # (h, w)
         dets = self(ims, conf_thresh, iou_thresh, do_curve_fit)
         return self.to_mode(dets, output_mode, orig_shape, self.cls_map)
 
     @staticmethod
     def to_mode(dets, output_mode, orig_shape, cls_map):
         """Convert detections to desired output mode."""
-        bboxes = np.array([det[:, :4] for det in dets])
-        scores = np.array([det[:, 4] for det in dets])
-        classes = np.array([det[:, 5] for det in dets])
+        bboxes = [det[:, :4] for det in dets]
+        scores = [det[:, 4] for det in dets]
+        classes = [det[:, 5] for det in dets]
 
         if output_mode == "tf":
             return AHOYv5.to_tf(bboxes, scores, classes, orig_shape)
@@ -316,7 +316,7 @@ class AHOYv5:
     def to_qa(bboxes, scores, classes, orig_shape, cls_map) -> List[List[list]]:
         """
         Named 'qa' for some historical reason since the QA department used this format.
-        Format is [[[x1, y1, x2, y2], class_name, class_id, score], ...]
+        Format is [[[y1, x1, y2, x2], class_name, class_id, score], ...]
         """
         if not cls_map:
             raise ValueError("Class mapping not found. Cannot convert to QA format.")

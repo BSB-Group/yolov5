@@ -2,6 +2,7 @@
 Inference using TensorRT engine.
 """
 
+import logging
 from typing import Union, List
 import numpy as np
 import tensorrt as trt
@@ -9,7 +10,7 @@ import pycuda.driver as cuda
 from .infer import Infer
 from .engine import load_engine, allocate_buffers, do_inference
 
-# TensorRT logger singleton
+# loggers
 TRT_LOGGER = trt.Logger(trt.Logger.ERROR)
 
 
@@ -34,7 +35,7 @@ class InferTRT(Infer):
         self.ctx = cuda.Device(device).make_context()
 
         # Display requested engine settings to stdout
-        print(f"Loading TensorRT inference engine {trt_engine_path}")
+        print(f"⚙️ Loading TensorRT inference engine {trt_engine_path}")
         self.trt_engine = self.load_model(trt_engine_path)
 
         # Execution context is needed for inference
@@ -45,8 +46,14 @@ class InferTRT(Infer):
             self.trt_engine
         )
 
-        for i, inp in enumerate(self.inputs):
-            print(f" - Input {i}: shape {inp.shape}, dtype {inp.dtype}")
+        print("⚙️ TensorRT engine loaded successfully.")
+        for i in self.inputs:
+            print(f" - 📥 Input {i.name}: shape {i.shape}, dtype {i.dtype}")
+        for o in self.outputs:
+            print(f" - 📤 Output {o.name}: shape {o.shape}, dtype {o.dtype}")
+
+        print("⏳ Warming up...")
+        self.warmup()
 
     def load_model(self, model_path: str):
         """
@@ -59,6 +66,20 @@ class InferTRT(Infer):
         """
         return load_engine(model_path, TRT_LOGGER)
 
+    def warmup(self, n: int = 10):
+        """
+        Warmup the model by running inference on a batch of images.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of warmup iterations.
+        """
+        ims = [np.zeros(inp.shape, dtype=inp.dtype) for inp in self.inputs]
+        ims = ims[0] if len(ims) == 1 else ims
+        for _ in range(n):
+            self.forward(ims)
+
     @property
     def input_shape(self) -> tuple:
         """Return input(s) shape of the model."""
@@ -68,7 +89,7 @@ class InferTRT(Infer):
         return shapes
 
     @property
-    def dtype(self) -> np.dtype:
+    def dtype(self) -> Union[np.dtype, List[np.dtype]]:
         """Return data type of the model."""
         dtypes = [inp.dtype for inp in self.inputs]
         if len(dtypes) == 1:

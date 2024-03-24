@@ -16,6 +16,10 @@ class Infer(ABC):
     def load_model(self, model_path: str):
         """Load a model from file."""
 
+    @abstractmethod
+    def warmup(self, n: int = 10):
+        """Warmup the model with a batch of images."""
+
     @property
     @abstractmethod
     def input_shape(self) -> Union[tuple, List[tuple]]:

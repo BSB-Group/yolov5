@@ -1,3 +1,8 @@
+"""
+Collection of image preprocessing functions for inference.
+Most functions are designed to work with NumPy arrays.
+"""
+
 from typing import Tuple
 import math
 import numpy as np
@@ -120,6 +125,36 @@ def resize_image_keeping_aspect_ratio(
     return cv2.resize(image, (new_width, new_height), interpolation=interpolation)
 
 
+def center_crop(image: np.ndarray, crop_hw: Tuple[int, int]) -> np.ndarray:
+    """
+    Center crop the image.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        The input image.
+    crop_hw : Tuple[int, int]
+        The height and width of the crop.
+
+    Returns
+    -------
+    np.ndarray
+        The center cropped image.
+    """
+
+    height, width = image.shape[:2]
+    crop_h, crop_w = crop_hw
+
+    if crop_h == height and crop_w == width:
+        return image
+
+    # Calculate the starting points for cropping
+    start_x = (width - crop_w) // 2
+    start_y = (height - crop_h) // 2
+
+    return image[start_y : start_y + crop_h, start_x : start_x + crop_w]
+
+
 def preprocess_yolo(
     ims: np.array, input_hw: Tuple[int, int], fp16: bool = False
 ) -> np.ndarray:
@@ -199,7 +234,8 @@ def resize_and_center_images_in_batch(
     pad_width = (w_o - w) // 2
 
     # Paste the input_batch into the output_batch
-    output_batch[:, :, pad_height: pad_height + h, pad_width: pad_width + w] = (
+    bi = input_batch.shape[0]  # in case of a partial batch
+    output_batch[:bi, :, pad_height : pad_height + h, pad_width : pad_width + w] = (
         input_batch
     )
 
