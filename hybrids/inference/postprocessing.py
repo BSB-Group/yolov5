@@ -334,7 +334,12 @@ def postprocess_yolo(
 
 
 def offset_theta_to_points(
-    offset: float, theta: float, w: int = 1, h: int = 1, offset_buffer: float = 0.15
+    offset: float,
+    theta: float,
+    w: int = 1,
+    h: int = 1,
+    offset_buffer: float = 0.15,
+    theta_gain: float = 1.0,
 ):
     """
     Convert offset and theta to two points.
@@ -342,26 +347,38 @@ def offset_theta_to_points(
     Args:
         offset (float): in [0,1] (horizon line center at offset=0.5)
         theta (float): in [0,1] (theta=0 is -pi/2, theta=1 is pi/2)
+        w (int): width of the image
+        h (int): height of the image
+        offset_buffer (float): bottom of the image and (1 - offset_buffer) is the
+            top of the image. Depends on how the model was trained.
+        theta_gain (float): scale theta (in rads) by this value
 
     Returns:
         (x1, y1), (x2, y2)
     """
-    m, b = offset_theta_to_slope_intercept(offset, theta, offset_buffer)
+    m, b = offset_theta_to_slope_intercept(offset, theta, offset_buffer, theta_gain)
     (x1, y1), (x2, y2) = slope_intercept_to_points(m, b, w, h)
-    y1, y2 = h - y1, h - y2  # invert y-axis since origin is top left corner
     return (x1, y1), (x2, y2)
 
 
 def offset_theta_to_slope_intercept(
-    offset: float, theta: float, offset_buffer: float = 0.15
+    offset: float, theta: float, offset_buffer: float = 0.15, theta_gain: float = 1.0
 ):
     """
     Convert offset and theta to slope-intercept form of line: m, b.
+
+     Args:
+        offset (float): in [0,1] (horizon line center at offset=0.5)
+        theta (float): in [0,1] (theta=0 is -pi/2, theta=1 is pi/2)
+        offset_buffer (float): bottom of the image and (1 - offset_buffer) is the
+            top of the image. Depends on how the model was trained.
+        theta_gain (float): scale theta by this value
     """
 
     # "decode" from [0, 1]
     offset = (offset - offset_buffer) / (1 - 2 * offset_buffer)
     theta = theta * np.pi - 0.5 * np.pi  # rad [-pi/2, pi/2]
+    theta *= theta_gain
 
     m = np.tan(theta)
     b = offset - m * 0.5
@@ -403,6 +420,7 @@ def gaussian_curve_fit(data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4)
 def postprocess_offset_theta(
     offset: np.array,
     theta: np.array,
+    input_hw: tuple,
     orig_hw: tuple,
     offset_buffer: float = 0.15,
     do_curve_fit: bool = False,
@@ -439,9 +457,10 @@ def postprocess_offset_theta(
         offset_prob, offset = offset.max(), offset.argmax() / len(offset)
         theta_prob, theta = theta.max(), theta.argmax() / len(theta)
 
-    # offset, theta = 0.6859624508938708, 0.48873562950280525
-    points = offset_theta_to_points(offset, theta, offset_buffer=offset_buffer)
-    points = np.array(points).flatten()
+    theta_gain = orig_hw[1] / input_hw[1]  # compensate for left-right padding
+    points = offset_theta_to_points(offset, theta, 1, 1, offset_buffer, theta_gain)
+    points = np.array(points).flatten()  # flatten to (x1, y1, x2, y2)
+    points[1::2] = 1 - points[1::2]  # invert y-axis since origin is top left corner
     points = scale_boxes(points, (1, 1), orig_hw)
     score = offset_prob * theta_prob  # pseudo-probability (because of softmax)
 
@@ -501,7 +520,7 @@ def postprocess_ahoy(
     # iterate over offset-theta outputs grouped by batch
     for i, (offset_logits, theta_logits) in enumerate(zip(*output[1:])):
         points, conf, cls = postprocess_offset_theta(
-            offset_logits, theta_logits, orig_hw, offset_buffer, do_curve_fit
+            offset_logits, theta_logits, input_hw, orig_hw, offset_buffer, do_curve_fit
         )
         # append hoizon line as a bbox (x1, y1, x2, y2)
         preds[i] = np.r_[preds[i], np.r_[points, conf, cls].reshape(1, -1)]
