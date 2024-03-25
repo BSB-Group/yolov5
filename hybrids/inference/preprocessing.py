@@ -236,7 +236,7 @@ def resize_and_center_images_in_batch(
     # Paste the input_batch into the output_batch
     bi = input_batch.shape[0]  # in case of a partial batch
     output_batch[:bi, :, pad_height : pad_height + h, pad_width : pad_width + w] = (
-        input_batch
+        input_batch  # implicitly cast to output_batch dtype
     )
 
     return output_batch
