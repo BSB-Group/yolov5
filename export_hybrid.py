@@ -116,7 +116,7 @@ def main(
             m.inplace = inplace
             m.dynamic = dynamic
             m.export = True
-    model.register_export_hooks()  # i/o : fp32->fp16/fp16->fp32
+    model.register_io_hooks()  # inp: uint8 -> fp32/fp16 / 255.0, out: fp16 -> fp32
 
     # Create dummy input
     image = get_dummy_input(batch_size, imgsz, False, model.device)
