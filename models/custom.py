@@ -174,7 +174,7 @@ class AHOY(nn.Module):
         self.names = self.obj_det.names
 
         # keep track of hooks
-        self.hooks = []
+        self.hooks = {}
 
     def forward(self, x, profile=False, visualize=False):
         """
@@ -184,32 +184,60 @@ class AHOY(nn.Module):
         pitch, theta = self.hor_det(x, profile, visualize)
         return objects, pitch, theta
 
-    def register_export_hooks(self):
+    def register_preprocessing_hook(self):
         """
-        Register hooks to convert float to half precision before forward pass
-        and half to float precision after forward pass.
+        Register hooks to convert uint8 to fp16/fp32 and scale by 1/255 before
+        forward pass.
         """
-        self.hooks.append(self.register_forward_pre_hook(self._float_to_half_pre_hook))
-        self.hooks.append(self.register_forward_hook(self._half_to_float_hook))
+        if "preprocessing" in self.hooks:
+            return
+        self.hooks["preprocessing"] = self.register_forward_pre_hook(
+            self._preprocessing_hook
+        )
+
+    def register_postprocessing_hook(self):
+        """
+        Register hooks to convert half to float precision after forward pass.
+        """
+        if "postprocessing" in self.hooks:
+            return
+        self.hooks["postprocessing"] = self.register_forward_hook(
+            self._postprocessing_hook
+        )
+
+    def register_io_hooks(self):
+        """
+        Register hooks for input and output processing.
+        """
+        self.register_preprocessing_hook()
+        self.register_postprocessing_hook()
 
     def remove_hooks(self):
         """
         Remove hooks.
         """
-        for hook in self.hooks:
+        for _, hook in self.hooks.items():
             hook.remove()
         self.hooks.clear()
 
     @staticmethod
-    def _float_to_half_pre_hook(module, inputs):
-        if not module.fp16:
-            return inputs  # ls
-        return tuple(
-            inp.half() if isinstance(inp, torch.Tensor) else inp for inp in inputs
-        )
+    def _preprocessing_hook(module, inputs):
+        """Add preprocessing operations to be part of the model."""
+
+        def _preprocess(x):
+            if not isinstance(x, torch.Tensor):
+                return x
+            x = x.half() if module.fp16 else x.float()
+            x = x / 255.0  # 0-255 to 0.0-1.0
+            return x
+
+        # if not module.fp16:
+        #     return inputs  # ls
+        return tuple(_preprocess(inp) for inp in inputs)
 
     @staticmethod
-    def _half_to_float_hook(module, inputs, outputs):
+    def _postprocessing_hook(module, inputs, outputs):
+        """Convert outputs to float if model is not in fp16."""
         if not module.fp16:
             return outputs
         # ahoy outputs: (tuple(Tensor, ...), Tensor, Tensor)
@@ -268,13 +296,12 @@ class DAN(nn.Module):
         # ir_objs, ir_pitch, ir_theta = self.ir_model(x_ir, profile, visualize)
         # return rgb_objs, rgb_pitch, rgb_theta, ir_objs, ir_pitch, ir_theta
 
-    def register_export_hooks(self):
+    def register_io_hooks(self):
         """
-        Register hooks to convert float to half precision before forward pass
-        and half to float precision after forward pass.
+        Register hooks for input and output processing.
         """
-        self.rgb_model.register_export_hooks()
-        self.ir_model.register_export_hooks()
+        self.rgb_model.register_io_hooks()
+        self.ir_model.register_io_hooks()
 
 
 class Hydra(BaseModel):
