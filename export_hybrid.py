@@ -71,7 +71,8 @@ def get_dummy_input(
     Create a dummy input image.
     """
     dummy_input = [
-        torch.zeros((bs, 3, sz, sz), device=device) for bs, sz in zip(batch_size, imgsz)
+        torch.randn((bs, 3, sz, sz), device=device).byte()
+        for bs, sz in zip(batch_size, imgsz)
     ]
     if half:
         dummy_input = [inp.half() for inp in dummy_input]
