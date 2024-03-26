@@ -173,6 +173,9 @@ class AHOY(nn.Module):
         self.stride = self.obj_det.stride
         self.names = self.obj_det.names
 
+        # keep track of hooks
+        self.hooks = []
+
     def forward(self, x, profile=False, visualize=False):
         """
         Forward pass through models.
@@ -180,6 +183,49 @@ class AHOY(nn.Module):
         objects = self.obj_det(x, profile, visualize)
         pitch, theta = self.hor_det(x, profile, visualize)
         return objects, pitch, theta
+
+    def register_export_hooks(self):
+        """
+        Register hooks to convert float to half precision before forward pass
+        and half to float precision after forward pass.
+        """
+        self.hooks.append(self.register_forward_pre_hook(self._float_to_half_pre_hook))
+        self.hooks.append(self.register_forward_hook(self._half_to_float_hook))
+
+    def remove_hooks(self):
+        """
+        Remove hooks.
+        """
+        for hook in self.hooks:
+            hook.remove()
+        self.hooks.clear()
+
+    @staticmethod
+    def _float_to_half_pre_hook(module, inputs):
+        if not module.fp16:
+            return inputs  # ls
+        return tuple(
+            inp.half() if isinstance(inp, torch.Tensor) else inp for inp in inputs
+        )
+
+    @staticmethod
+    def _half_to_float_hook(module, inputs, outputs):
+        if not module.fp16:
+            return outputs
+        # ahoy outputs: (tuple(Tensor, ...), Tensor, Tensor)
+        first_tuple, second_item, third_item = outputs
+
+        # Convert the first item of the first tuple to float
+        converted_first_item = first_tuple[0].float()
+
+        # Reconstruct the first tuple if there are more items in it
+        if len(first_tuple) > 1:
+            new_first_tuple = (converted_first_item,) + first_tuple[1:]
+        else:
+            new_first_tuple = (converted_first_item,)
+
+        # Reconstruct the overall output
+        return (new_first_tuple, second_item.float(), third_item.float())
 
 
 class DAN(nn.Module):
@@ -221,6 +267,14 @@ class DAN(nn.Module):
         # rgb_objs, rgb_pitch, rgb_theta = self.rgb_model(x_rgb, profile, visualize)
         # ir_objs, ir_pitch, ir_theta = self.ir_model(x_ir, profile, visualize)
         # return rgb_objs, rgb_pitch, rgb_theta, ir_objs, ir_pitch, ir_theta
+
+    def register_export_hooks(self):
+        """
+        Register hooks to convert float to half precision before forward pass
+        and half to float precision after forward pass.
+        """
+        self.rgb_model.register_export_hooks()
+        self.ir_model.register_export_hooks()
 
 
 class Hydra(BaseModel):

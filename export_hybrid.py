@@ -35,7 +35,7 @@ def init_model(
     hor_weights: List[str],
     half: bool,
     fuse: bool,
-) -> torch.nn.Module:
+) -> Union[AHOY, DAN]:
     """
     Load the AHOY or DAN model based on the number of weights provided.
     """
@@ -118,7 +118,7 @@ def main(
             m.export = True
 
     # Create dummy input
-    image = get_dummy_input(batch_size, imgsz, half, model.device)
+    image = get_dummy_input(batch_size, imgsz, False, model.device)
     # need to run once to get the model to JIT compile
     if isinstance(image, (list, tuple)):
         print(f"🔮 Dummy input...{[im.shape for im in image]}")
@@ -127,6 +127,7 @@ def main(
         print(f"🔮 Dummy input...{image.shape}")
         model(image)
 
+    model.register_export_hooks()
     export_engine(
         model,
         im=image,
