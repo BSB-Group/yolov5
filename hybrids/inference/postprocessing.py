@@ -6,7 +6,6 @@ Most functions are designed to work with NumPy arrays.
 from typing import Tuple, Sequence
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.special import softmax
 
 
 def cxcywh_to_xyxy(bboxes: np.ndarray) -> np.ndarray:
@@ -431,9 +430,9 @@ def postprocess_offset_theta(
     Parameters
     ----------
     offset : np.array
-        Offset vector (classification logits)
+        Offset vector (classification softmax)
     theta : np.array
-        Theta vector (classification logits)
+        Theta vector (classification softmax)
     orig_hw : tuple
         Original image shape (height, width)
     offset_buffer : float, optional
@@ -447,8 +446,6 @@ def postprocess_offset_theta(
         offset = (offset, offset_score)
         theta = (theta, theta_score)
     """
-
-    offset, theta = softmax(offset), softmax(theta)
 
     if do_curve_fit:
         offset_prob, offset, _ = gaussian_curve_fit(offset)
