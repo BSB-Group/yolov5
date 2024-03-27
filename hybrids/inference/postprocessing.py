@@ -244,7 +244,7 @@ def nms(
     areas = (x2 - x1) * (y2 - y1)  # calculate area per bbox
     order = np.argsort(scores)[::-1]  # sort by descending confidence
 
-    keep = np.bool_(np.zeros_like(scores))  # # which boxes (idx) to keep
+    keep = np.zeros_like(scores, dtype=bool)  # which boxes (idx) to keep
 
     while order.size > 1:
         # take current highest confidence box

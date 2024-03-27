@@ -65,17 +65,17 @@ def init_model(
 
 
 def get_dummy_input(
-    batch_size: int, imgsz: int, half: bool, device: str
+    batch_size: int, imgsz: int, device: str, fp32=False
 ) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     """
     Create a dummy input image.
     """
     dummy_input = [
-        torch.randn((bs, 3, sz, sz), device=device).byte()
+        torch.zeros((bs, 3, sz, sz), device=device).byte()
         for bs, sz in zip(batch_size, imgsz)
     ]
-    if half:
-        dummy_input = [inp.half() for inp in dummy_input]
+    if fp32:
+        dummy_input = [inp.float() for inp in dummy_input]
     if len(dummy_input) == 1:
         return dummy_input[0]
     return dummy_input
@@ -95,6 +95,7 @@ def main(
     batch_size: List[int],
     half: bool,
     fuse: bool,
+    input_as_fp32: bool = False,
     engine_fname: str = "",
 ):
     """
@@ -120,10 +121,10 @@ def main(
     model.register_io_hooks()  # inp: uint8 -> fp32/fp16 / 255.0, out: fp16 -> fp32
 
     # Create dummy input
-    image = get_dummy_input(batch_size, imgsz, False, model.device)
+    image = get_dummy_input(batch_size, imgsz, model.device, input_as_fp32)
     # need to run once to get the model to JIT compile
     if isinstance(image, (list, tuple)):
-        print(f"🔮 Dummy input...{[im.shape for im in image]}")
+        print(f"🔮 Dummy input...{[(im.shape, im.dtype) for im in image]}")
         model(*image)
     else:
         print(f"🔮 Dummy input...{image.shape}")
@@ -185,6 +186,12 @@ def _parse_args():
         "--fuse",
         action="store_true",
         help="Fuse convolution and batchnorm layers.",
+    )
+    parser.add_argument(
+        "-ifp32",
+        "--input-as-fp32",
+        action="store_true",
+        help="Input image as FP32.",
     )
     parser.add_argument(
         "-ef",

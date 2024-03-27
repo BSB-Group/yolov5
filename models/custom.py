@@ -86,7 +86,7 @@ class HorizonModel(BaseModel):
 
     def _forward_once(self, x, profile=False, visualize=False):
         x_pitch, x_theta = None, None
-        y = []  # outputs
+        y, dt = [], []  # outputs
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = (
@@ -95,7 +95,7 @@ class HorizonModel(BaseModel):
                     else [x if j == -1 else y[j] for j in m.f]
                 )  # from earlier layers
             if profile:
-                self._profile_one_layer(m, x)
+                self._profile_one_layer(m, x, dt)
             if m.type == "models.common.Classify" and "pitch" in m.i:
                 x_pitch = m(x)
             elif m.type == "models.common.Classify" and "theta" in m.i:
@@ -251,6 +251,9 @@ class AHOY(nn.Module):
             new_first_tuple = (converted_first_item,) + first_tuple[1:]
         else:
             new_first_tuple = (converted_first_item,)
+
+        second_item = second_item.softmax(-1)  # batch dim
+        third_item = third_item.softmax(-1)  # batch dim
 
         # Reconstruct the overall output
         return (new_first_tuple, second_item.float(), third_item.float())
