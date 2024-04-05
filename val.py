@@ -148,6 +148,9 @@ def run(
     callbacks=Callbacks(),
     compute_loss=None,
 ):
+    
+    single_cls = True
+    
     if model is not None:
         hyp = model.hyp  # hyperparameters
     else:
