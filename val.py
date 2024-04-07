@@ -279,6 +279,8 @@ def run(
             # Predictions
             if single_cls:
                 pred[:, 5] = 0
+                labels[:, 0] = 0
+                
             predn = pred.clone()
             scale_boxes(im[si].shape[1:], predn[:, :4], shape, shapes[si][1])  # native-space pred
 
