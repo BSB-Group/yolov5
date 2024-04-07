@@ -263,11 +263,6 @@ def run(
 
         # Metrics
         for si, pred in enumerate(preds):
-            
-            # Predictions
-            if single_cls:
-                pred[:, 5] = 0
-                labels[:, 0] = 0
                 
             labels = targets[targets[:, 0] == si, 1:]
             nl, npr = labels.shape[0], pred.shape[0]  # number of labels, predictions
@@ -281,7 +276,9 @@ def run(
                     if plots:
                         confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
                 continue
-                
+            # Predictions
+            if single_cls:
+                pred[:, 5] = 0                
             predn = pred.clone()
             scale_boxes(im[si].shape[1:], predn[:, :4], shape, shapes[si][1])  # native-space pred
 
