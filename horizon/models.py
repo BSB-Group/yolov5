@@ -188,39 +188,36 @@ class DAN(nn.Module):
     And
     Night
 
-    Two models: one for RGB images and one for IR (thermal) images.
+    Two models in one, ideally one for day and one for night.
     """
 
     # Ensemble of models
     def __init__(
         self,
-        rgb_model: AHOY,
-        ir_model: AHOY,
+        model_a: AHOY,
+        model_b: AHOY,
     ):
         super().__init__()
         # check if both models are in same device
-        if rgb_model.device != ir_model.device:
+        if model_a.device != model_b.device:
             raise ValueError("Both models must be on the same device")
-        self.device = rgb_model.device
+        self.device = model_a.device
 
         # check if both models are in fp16
-        if rgb_model.fp16 != ir_model.fp16:
+        if model_a.fp16 != model_b.fp16:
             raise ValueError("Both models must be in the same precision")
-        self.fp16 = rgb_model.fp16
+        self.fp16 = model_a.fp16
 
-        self.rgb_model = rgb_model
-        self.ir_model = ir_model
+        self.model_a = model_a
+        self.model_b = model_b
 
     def forward(self, x_rgb, x_ir, profile=False, visualize=False):
         """
         Forward pass through models.
         """
-        rgb_out = self.rgb_model(x_rgb, profile, visualize)
-        ir_out = self.ir_model(x_ir, profile, visualize)
-        return rgb_out, ir_out
-        # rgb_objs, rgb_pitch, rgb_theta = self.rgb_model(x_rgb, profile, visualize)
-        # ir_objs, ir_pitch, ir_theta = self.ir_model(x_ir, profile, visualize)
-        # return rgb_objs, rgb_pitch, rgb_theta, ir_objs, ir_pitch, ir_theta
+        out_a = self.model_a(x_rgb, profile, visualize)
+        out_b = self.model_b(x_ir, profile, visualize)
+        return out_a, out_b
 
 
 class Hydra(BaseModel):

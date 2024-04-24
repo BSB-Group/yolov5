@@ -219,10 +219,10 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
     # Metadata
     if isinstance(model, DAN):
         d = {
-            "stride0": int(max(model.rgb_model.stride)),
-            "stride1": int(max(model.ir_model.stride)),
-            "names0": model.rgb_model.names,
-            "names1": model.ir_model.names,
+            "stride_a": int(max(model.model_a.stride)),
+            "stride_b": int(max(model.model_b.stride)),
+            "names_a": model.model_a.names,
+            "names_b": model.model_b.names,
         }
     else:
         d = {"stride": int(max(model.stride)), "names": model.names}
@@ -365,13 +365,13 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
             export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
             model.obj_det.model[-1].anchor_grid = grid
         elif isinstance(model, DAN):
-            rgb_grid = model.rgb_model.obj_det.model[-1].anchor_grid
-            model.rgb_model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in rgb_grid]
-            ir_grid = model.ir_model.obj_det.model[-1].anchor_grid
-            model.ir_model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in ir_grid]
+            grid_a = model.model_a.obj_det.model[-1].anchor_grid
+            model.model_a.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_a]
+            grid_b = model.model_b.obj_det.model[-1].anchor_grid
+            model.model_b.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_b]
             export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
-            model.rgb_model.obj_det.model[-1].anchor_grid = rgb_grid
-            model.ir_model.obj_det.model[-1].anchor_grid = ir_grid
+            model.model_a.obj_det.model[-1].anchor_grid = grid_a
+            model.model_b.obj_det.model[-1].anchor_grid = grid_b
         else:
             grid = model.model[-1].anchor_grid
             model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]

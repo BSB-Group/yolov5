@@ -48,13 +48,13 @@ def init_model(
         )
     if len(det_weights) == len(hor_weights) == 2:
         return DAN(
-            rgb_model=AHOY(
+            model_a=AHOY(
                 obj_det_weigths=det_weights[0],
                 hor_det_weights=hor_weights[0],
                 fp16=half,
                 fuse=fuse,
             ),
-            ir_model=AHOY(
+            model_b=AHOY(
                 obj_det_weigths=det_weights[1],
                 hor_det_weights=hor_weights[1],
                 fp16=half,
