@@ -24,12 +24,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-from utils.general import TQDM_BAR_FORMAT, LOGGER
-from utils.torch_utils import smart_optimizer, ModelEMA
-from utils.downloads import attempt_download
+from utils.general import TQDM_BAR_FORMAT, LOGGER  # noqa: E402
+from utils.torch_utils import smart_optimizer, ModelEMA  # noqa: E402
+from utils.downloads import attempt_download  # noqa: E402
 
-from models.custom import HorizonModel
-from horizon.dataloaders import (
+from models.custom import HorizonModel  # noqa: E402
+from horizon.dataloaders import (  # noqa: E402
     get_train_rgb_dataloader,
     get_val_rgb_dataloader,
     get_train_ir16bit_dataseloader,
@@ -89,7 +89,7 @@ def get_dataloaders(
 
 
 def update(
-    model,
+    model: HorizonModel,
     train_dataloader: DataLoader,
     loss_pitch: CrossEntropyLoss,
     loss_theta: CrossEntropyLoss,
@@ -101,6 +101,8 @@ def update(
     epoch: int,
     epochs: int,
 ):
+    """Update model weights via backpropagation."""
+
     # initialize mean losses
     t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
 
@@ -115,17 +117,15 @@ def update(
         images, targets = data
         images, targets = images.to(model.device), targets.to(model.device)
 
+        # process targets
+        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
+
         # forward
         x_pitch, x_theta = model(images)
 
-        # process targets
-        pitch, theta = targets[..., 0], targets[..., 1]
-        pitch = (pitch * model.nc_pitch).long().clamp(0, model.nc_pitch - 1)
-        theta = (theta * model.nc_theta).long().clamp(0, model.nc_theta - 1)
-
         # backward
-        _loss_pitch = loss_pitch(x_pitch, pitch)
-        _loss_theta = loss_theta(x_theta, theta)
+        _loss_pitch = loss_pitch(x_pitch, pitch_i)
+        _loss_theta = loss_theta(x_theta, theta_i)
         loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta
         scaler.scale(loss).backward()
 
@@ -154,7 +154,7 @@ def update(
 
 
 def evaluate(
-    model,
+    model: HorizonModel,
     val_dataloader: DataLoader,
     loss_pitch: CrossEntropyLoss,
     loss_theta: CrossEntropyLoss,
@@ -164,6 +164,8 @@ def evaluate(
     epoch: int,
     epochs: int,
 ):
+    """Evaluate model on validation set."""
+
     # use MSE as metric
     criterion_pitch = torch.nn.MSELoss()
     criterion_theta = torch.nn.MSELoss()
@@ -184,30 +186,24 @@ def evaluate(
         images, targets = images.to(model.device), targets.to(model.device)
 
         with torch.no_grad():
-            # forward
             x_pitch, x_theta = ema.ema(images)
 
-        # metrics
-        mse_pitch += criterion_pitch(
-             targets[..., 0], x_pitch.max(1, keepdim=True)[1] / x_pitch.shape[-1]
-        ).item()
-        mse_theta += criterion_theta(
-            targets[..., 1], x_theta.max(1, keepdim=True)[1] / x_theta.shape[-1]
-        ).item()
-
-        # process targets (normalized to class index)
-        pitch, theta = targets[..., 0], targets[..., 1]
-        pitch = (pitch * model.nc_pitch).long().clamp(0, ema.ema.nc_pitch - 1)
-        theta = (theta * model.nc_theta).long().clamp(0, ema.ema.nc_theta - 1)
+        # process targets
+        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
 
         # store losses
-        _loss_pitch = loss_pitch(x_pitch, pitch)
-        _loss_theta = loss_theta(x_theta, theta)
+        _loss_pitch = loss_pitch(x_pitch, pitch_i)
+        _loss_theta = loss_theta(x_theta, theta_i)
         loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta
 
         v_loss = (v_loss * i + loss.item()) / (i + 1)  # update mean losses
         v_ploss = (v_ploss * i + _loss_pitch.item()) / (i + 1)
         v_tloss = (v_tloss * i + _loss_theta.item()) / (i + 1)
+
+        # calculate MSE
+        (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
+        mse_pitch += criterion_pitch(y_pitch, targets[..., 0])
+        mse_theta += criterion_theta(y_theta, targets[..., 1])
 
         mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
         losses_str = f"{v_loss:>12.3g}{v_ploss:>12.3g}{v_tloss:>12.3g}"

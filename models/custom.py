@@ -108,6 +108,90 @@ class HorizonModel(BaseModel):
 
         return (x_pitch, x_theta)
 
+    def to_discrete(self, pitch: torch.Tensor, theta: torch.Tensor):
+        """Take values from [0, 1] and convert to discrete values.
+
+        Values are rounded and clamped to [0, nc_pitch - 1] and [0, nc_theta - 1].
+        """
+        pitch_i = (pitch * self.nc_pitch).round().clamp(0, self.nc_pitch - 1).int()
+        theta_i = (theta * self.nc_theta).round().clamp(0, self.nc_theta - 1).int()
+        return pitch_i, theta_i
+
+    def to_continuous(self, pitch_i: torch.Tensor, theta_i: torch.Tensor):
+        """Take discrete values and convert to continuous values.
+
+        NOTE: Exact values cannot be guaranteed because of rounding.
+        """
+        pitch = pitch_i.float() / (self.nc_pitch)
+        theta = theta_i.float() / (self.nc_theta)
+        return pitch, theta
+
+    @staticmethod
+    def postprocess(x_pitch: torch.Tensor, x_theta: torch.Tensor):
+        """Postprocess classification heads.
+
+        Args:
+            x_pitch (torch.Tensor): pitch classification head
+            x_theta (torch.Tensor): theta classification head
+
+        Returns:
+            tuple: (score_pitch, val_pitch), (score_theta, val_theta)
+        """
+        x_pitch, x_theta = x_pitch.softmax(-1), x_theta.softmax(-1)
+        score_pitch, y_pitch = x_pitch.max(-1)
+        score_theta, y_theta = x_theta.max(-1)
+
+        # normalise pitch and theta
+        y_pitch = y_pitch / x_pitch.size(-1)
+        y_theta = y_theta / x_theta.size(-1)
+
+        return (y_pitch, score_pitch), (y_theta, score_theta)
+
+    @staticmethod
+    def postprocess_curve_fit(x_pitch: torch.Tensor, x_theta: torch.Tensor):
+        """Postprocess classification heads using Gaussian curve fitting.
+
+        NOTE: Experimental!, supports only batch size of 1.
+
+        Args:
+            x_pitch (torch.Tensor): pitch classification head
+            x_theta (torch.Tensor): theta classification head
+
+        Returns:
+            tuple: (score_pitch, val_pitch), (score_theta, val_theta)
+        """
+        import numpy as np
+        from scipy.optimize import curve_fit
+
+        # convert to numpy
+        x_pitch = x_pitch.squeeze().softmax(-1).cpu().numpy()
+        x_theta = x_theta.squeeze().softmax(-1).cpu().numpy()
+
+        # curve to fit
+        def gaussian(x, amplitude, mu, sigma):
+            return amplitude * np.exp(-((x - mu) ** 2) / (2 * sigma**2))
+
+        # Initial guess for the parameters (amplitude, mean, standard deviation)
+        initial_pitch_guess = [
+            x_pitch.max(),
+            x_pitch.argmax() / x_pitch.shape[-1],
+            0.001,
+        ]
+        initial_theta_guess = [
+            x_theta.max(),
+            x_theta.argmax() / x_theta.shape[-1],
+            0.001,
+        ]
+
+        x = np.linspace(0, 1, len(x_pitch), endpoint=False)
+        fitted_pitch = curve_fit(gaussian, x, x_pitch, p0=initial_pitch_guess)
+        fitted_theta = curve_fit(gaussian, x, x_theta, p0=initial_theta_guess)
+
+        amp_pitch, mu_pitch, sigma_pitch = fitted_pitch[0]
+        amp_theta, mu_theta, sigma_theta = fitted_theta[0]
+
+        return (mu_pitch, amp_pitch, sigma_pitch), (mu_theta, amp_theta, sigma_theta)
+
 
 class ObjectsModel(BaseModel):
     """

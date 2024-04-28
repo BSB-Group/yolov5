@@ -17,9 +17,10 @@ def postprocess_x_pitch_theta(x_pitch, x_theta):
 
 
 def points_to_pitch_theta(x1: float, y1: float, x2: float, y2: float):
-    """Parameterize line that is spanned by the two points (x1, y1) and (x2, y2) through pitch and theta
-       pitch ... y-value of line where x=0.5 (pitch=0 is at the bottom, pitch=1 is at the top)
-       theta ... angle between line and y=0.5 (aka horizontal line)
+    """Parametrize line that is spanned by the two points (x1, y1) and (x2, y2) through pitch and theta
+
+       - pitch ... y-value of line where x=0.5 (pitch=0 is at the bottom, pitch=1 is at the top)
+       - theta ... angle between line and y=0.5 (aka horizontal line)
 
        Assumptions:
        Coordinates are in range [0, 1].
@@ -35,15 +36,14 @@ def points_to_pitch_theta(x1: float, y1: float, x2: float, y2: float):
         pitch (float): in [0,1] (pitch=0.25 is bottom, pitch=0.75 is top)
         theta (float): in [0,1] (theta=0 is -pi/2, theta=1 is pi/2)
     """
-    assert x1 != x2, "Line is not allowed to be perfectly vertical or pitch would be infinite"
+    assert (
+        x1 != x2
+    ), "Line is not allowed to be perfectly vertical or pitch would be infinite"
 
-    if (x1 > x2):
-        tmp_x, tmp_y = x2, y2
-        x2 = x1
-        y2 = y1
-        x1 = tmp_x
-        y1 = tmp_y
+    if x1 > x2:  # make sure x1 < x2
+        x1, y1, x2, y2 = x2, y2, x1, y1
 
+    # invert y-axis since origin is top left corner
     y1 = 1 - y1
     y2 = 1 - y2
 
@@ -154,27 +154,27 @@ def hough_to_slope_intercept(rho, theta, h=1, w=1):
     return m, b
 
 
-def draw_horizon(image,
-                 keypoints=None,
-                 pitch_theta=None,
-                 hough=None,
-                 color=(0, 255, 0),
-                 diameter=2):
+def draw_horizon(
+    image, keypoints=None, pitch_theta=None, hough=None, color=(0, 255, 0), diameter=2
+):
     """
     Visualize horizon line on image.
     """
-    assert np.any([arg is not None for arg in [keypoints, pitch_theta, hough]]), \
-        "Provide at least one of keypoints, theta_pitch, hough"
+    assert np.any(
+        [arg is not None for arg in [keypoints, pitch_theta, hough]]
+    ), "Provide at least one of keypoints, theta_pitch, hough"
 
     image = image.copy()
 
     if keypoints is not None:
         x1, y1, x2, y2 = np.array(keypoints).flatten()
-        for (x, y) in keypoints:
+        for x, y in keypoints:
             cv2.circle(image, (int(x), int(y)), diameter * 5, (0, 255, 0), -1)
 
     if pitch_theta is not None:
-        (x1, y1), (x2, y2) = pitch_theta_to_points(*pitch_theta, image.shape[1], image.shape[0])
+        (x1, y1), (x2, y2) = pitch_theta_to_points(
+            *pitch_theta, image.shape[1], image.shape[0]
+        )
 
     if hough is not None:
         (x1, y1), (x2, y2) = hough_to_points(*hough, image.shape[1], image.shape[0])
