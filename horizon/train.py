@@ -269,6 +269,7 @@ def run(
 
     ema = ModelEMA(model)
     best_loss = 1e10
+    best_mse = 1e10
 
     model.info()
     LOGGER.info("Starting training...\n")
@@ -322,6 +323,20 @@ def run(
                 "date": datetime.now().isoformat(),
             }
             torch.save(ckpt, ckpt_dir / "best.pt")
+            del ckpt
+
+        if mse_pitch + mse_theta < best_mse:
+            best_mse = mse_pitch + mse_theta
+            ckpt = {
+                "epoch": epoch,
+                "model": deepcopy(ema.ema),  # deepcopy(de_parallel(model)).half(),
+                "ema": None,  # deepcopy(ema.ema).half(),
+                "updates": ema.updates,
+                "optimizer": None,  # optimizer.state_dict(),
+                "losses": dict(pitch=v_ploss, theta=v_tloss, total=v_loss),
+                "date": datetime.now().isoformat(),
+            }
+            torch.save(ckpt, ckpt_dir / "best_mse.pt")
             del ckpt
 
         # Save latest checkpoint
