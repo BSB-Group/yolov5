@@ -113,8 +113,8 @@ class HorizonModel(BaseModel):
 
         Values are rounded and clamped to [0, nc_pitch - 1] and [0, nc_theta - 1].
         """
-        pitch_i = (pitch * self.nc_pitch).round().clamp(0, self.nc_pitch - 1).int()
-        theta_i = (theta * self.nc_theta).round().clamp(0, self.nc_theta - 1).int()
+        pitch_i = (pitch * self.nc_pitch).round().clamp(0, self.nc_pitch - 1).long()
+        theta_i = (theta * self.nc_theta).round().clamp(0, self.nc_theta - 1).long()
         return pitch_i, theta_i
 
     def to_continuous(self, pitch_i: torch.Tensor, theta_i: torch.Tensor):
