@@ -202,8 +202,8 @@ def evaluate(
 
         # calculate MSE
         (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
-        mse_pitch += criterion_pitch(y_pitch, targets[..., 0])
-        mse_theta += criterion_theta(y_theta, targets[..., 1])
+        mse_pitch += criterion_pitch(y_pitch, targets[..., 0]).item()
+        mse_theta += criterion_theta(y_theta, targets[..., 1]).item()
 
         mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
         losses_str = f"{v_loss:>12.3g}{v_ploss:>12.3g}{v_tloss:>12.3g}"
