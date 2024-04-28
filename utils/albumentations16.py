@@ -7,7 +7,7 @@ from albumentations.core.transforms_interface import ImageOnlyTransform, to_tupl
 
 
 def convert_16bit_to_8bit(im, augment=True):
-    if not len(im.shape) == 2:
+    if len(im.shape) == 3 and im.shape[2] == 3:
         # for some reason, some 16bit images have 3 channels
         im = im[:, :, 0]
     transform = get_16_to_8_transform(augment)

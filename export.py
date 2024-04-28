@@ -219,10 +219,8 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
     # Metadata
     if isinstance(model, DAN):
         d = {
-            "stride_a": int(max(model.model_a.stride)),
-            "stride_b": int(max(model.model_b.stride)),
-            "names_a": model.model_a.names,
-            "names_b": model.model_b.names,
+            "stride": [int(max(model.model_a.stride)), int(max(model.model_b.stride))],
+            "names": [model.model_a.names, model.model_b.names]
         }
     else:
         d = {"stride": int(max(model.stride)), "names": model.names}

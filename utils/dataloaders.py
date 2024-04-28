@@ -1014,7 +1014,7 @@ def imread_16bit_compatible(f, augment16=False):
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB) # RGB
     if im.dtype == np.uint16:
         try:
-            from utils.augmentations16 import convert_16bit_to_8bit
+            from utils.albumentations16 import convert_16bit_to_8bit
             im = convert_16bit_to_8bit(im, augment=augment16) # RGB
         except Exception as e:
             print(f"WARNING: Failed to convert image {f} from 16-bit to 8-bit")

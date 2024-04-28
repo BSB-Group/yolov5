@@ -14,11 +14,12 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
-import utils.augmentations16 as A16
+import utils.albumentations16 as A16
+import utils.albumextensions as Ax
 from utils.horizon import points_to_pitch_theta  # points_to_hough
 
 
-def horizon_augment_RGB(imgsz: int) -> A.Compose:
+def horizon_augment_rgb(imgsz: int) -> A.Compose:
     """
     Augmentations for RGB images.
 
@@ -41,7 +42,7 @@ def horizon_augment_RGB(imgsz: int) -> A.Compose:
         A.Blur(p=0.05),
 
         # geometric transforms
-        A.LongestMaxSize(max_size=imgsz),
+        Ax.ResizeIfNeeded(max_size=imgsz),
         A.HorizontalFlip(p=0.5),
         A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
         A.ShiftScaleRotate(p=1, shift_limit=0.1, scale_limit=0.25, rotate_limit=30, border_mode=cv2.BORDER_CONSTANT),
@@ -52,7 +53,7 @@ def horizon_augment_RGB(imgsz: int) -> A.Compose:
     ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
 
-def horizon_base_RGB(imgsz: int) -> A.Compose:
+def horizon_base_rgb(imgsz: int) -> A.Compose:
     """
     No augmentation, just resize and normalize.
 
@@ -61,7 +62,7 @@ def horizon_base_RGB(imgsz: int) -> A.Compose:
     """
     return A.Compose([
         # geometric transforms
-        A.LongestMaxSize(max_size=imgsz),
+        Ax.ResizeIfNeeded(max_size=imgsz),
         A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
 
         # torch-related transforms
@@ -70,7 +71,7 @@ def horizon_base_RGB(imgsz: int) -> A.Compose:
     ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
 
-def horizon_augment_IR16bit(imgsz: int) -> A.Compose:
+def horizon_augment_ir16bit(imgsz: int) -> A.Compose:
     """
     Augmentations for 16-bit IR images.
 
@@ -86,7 +87,7 @@ def horizon_augment_IR16bit(imgsz: int) -> A.Compose:
         A.ToRGB(p=1.0),
 
         # geometric transforms
-        A.LongestMaxSize(max_size=imgsz),
+        Ax.ResizeIfNeeded(max_size=imgsz),
         A.HorizontalFlip(p=0.5),
         A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
         A.ShiftScaleRotate(p=1, shift_limit=0.1, scale_limit=0.25, rotate_limit=20, border_mode=cv2.BORDER_CONSTANT),
@@ -97,7 +98,7 @@ def horizon_augment_IR16bit(imgsz: int) -> A.Compose:
     ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
 
-def horizon_base_IR16bit(imgsz: int,
+def horizon_base_ir16bit(imgsz: int,
                          lower_limit: float = 15000 / 65535,
                          upper_limit: float = 28000 / 65535,
                          clahe: bool = True,
@@ -122,7 +123,7 @@ def horizon_base_IR16bit(imgsz: int,
         A.ToRGB(p=1.0),
 
         # geometric transforms
-        A.LongestMaxSize(max_size=imgsz),
+        Ax.ResizeIfNeeded(max_size=imgsz),
         A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
 
         # torch-related transforms
