@@ -250,7 +250,7 @@ def evaluate(
         ) / (i + 1)
 
         pbar.set_description(
-            ("%22s" + "%11s" * 5)
+            ("%22s" + "%11.4g" * 5)
             % (
                 "",
                 mse_pitch + mse_theta,
