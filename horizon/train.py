@@ -451,7 +451,10 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
     indices = rng.choice(len(dataloader.dataset), size=n, replace=False)
     model.eval()
     wb_images = []
-    mask_labels = {0: "background", 1: "horizon"}  # keys are class indices (pixel values)
+    mask_labels = {
+        0: "background",
+        1: "horizon",
+    }  # keys are class indices (pixel values)
 
     for i in indices:
         images, targets = dataloader.dataset[i]
@@ -468,8 +471,9 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
         gt_points = pitch_theta_to_points(
             targets[0], targets[1], input_hw=images.shape[-2:], orig_hw=im.shape[:2]
         )
+        gt_points = np.array(gt_points).astype(np.int32)
         gt_mask = np.zeros(im.shape, dtype=np.uint8)  # 0=background, 1=horizon
-        cv2.line(gt_mask, gt_points[0], gt_points[1],color= 1, thickness=4)
+        cv2.line(gt_mask, gt_points[0], gt_points[1], color=1, thickness=4)
 
         y_points = pitch_theta_to_points(
             y_pitch.item(),
@@ -477,6 +481,7 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
             input_hw=images.shape[-2:],
             orig_hw=im.shape[:2],
         )
+        y_points = np.array(y_points).astype(np.int32)
         y_mask = np.zeros(im.shape, dtype=np.uint8)  # 0=background, 1=horizon
         cv2.line(y_mask, y_points[0], y_points[1], color=1, thickness=4)
 
