@@ -37,7 +37,7 @@ from models.custom import HorizonModel  # noqa: E402
 from horizon.dataloaders import (  # noqa: E402
     get_train_rgb_dataloader,
     get_val_rgb_dataloader,
-    get_train_ir16bit_dataseloader,
+    get_train_ir16bit_dataloader,
     get_val_ir16bit_dataloader,
 )
 
@@ -73,7 +73,7 @@ def get_dataloaders(
             batch_size=64 if imgsz == 640 else 16,
         )
     else:
-        train_dataloader = get_train_ir16bit_dataseloader(
+        train_dataloader = get_train_ir16bit_dataloader(
             dataset=(
                 fo.load_dataset(dataset_name)
                 .match(F(field) == [False])
@@ -113,6 +113,17 @@ def update(
 
     # initialize mean losses
     t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
+
+    s = ("\n" + "%11s" * 7) % (
+        "Epoch",
+        "GPU_mem",
+        "total_loss",
+        "pitch_loss",
+        "theta_loss",
+        "Instances",
+        "Size",
+    )
+    LOGGER.info(s)
 
     # iterate over batches
     pbar = tqdm(
@@ -155,9 +166,17 @@ def update(
         t_tloss = (t_tloss * i + _loss_theta.item()) / (i + 1)
 
         mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
-        losses_str = f"{t_loss:>12.3g}{t_ploss:>12.3g}{t_tloss:>12.3g}"
-        pbar.desc = (
-            f"{'train':>6}{f'{epoch + 1}/{epochs}':>10}{mem:>10}{losses_str}" + " " * 10
+        pbar.set_description(
+            ("%11s" * 2 + "%11.4g" * 5)
+            % (
+                f"{epoch}/{epochs - 1}",
+                mem,
+                t_loss,
+                t_ploss,
+                t_tloss,
+                targets.shape[0],
+                images.shape[-1],
+            )
         )
 
     return t_loss, t_ploss, t_tloss
@@ -184,6 +203,15 @@ def evaluate(
     # initialize mean losses
     v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
 
+    s = ("\n" + "%22s" + "%11s" * 5) % (
+        "",
+        "total_mse",
+        "pitch_mse",
+        "theta_mse",
+        "Instances",
+        "Size",
+    )
+    LOGGER.info(s)
     # iterate over batches
     pbar = tqdm(
         enumerate(val_dataloader),
@@ -212,15 +240,25 @@ def evaluate(
         v_ploss = (v_ploss * i + _loss_pitch.item()) / (i + 1)
         v_tloss = (v_tloss * i + _loss_theta.item()) / (i + 1)
 
-        # calculate MSE
+        # update running mean of MSE
         (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
-        mse_pitch += criterion_pitch(y_pitch, targets[..., 0]).item()
-        mse_theta += criterion_theta(y_theta, targets[..., 1]).item()
+        mse_pitch = (
+            mse_pitch * i + criterion_pitch(y_pitch, targets[..., 0]).item()
+        ) / (i + 1)
+        mse_theta = (
+            mse_theta * i + criterion_theta(y_theta, targets[..., 1]).item()
+        ) / (i + 1)
 
-        mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
-        losses_str = f"{v_loss:>12.3g}{v_ploss:>12.3g}{v_tloss:>12.3g}"
-        pbar.desc = (
-            f"{'train':>6}{f'{epoch + 1}/{epochs}':>10}{mem:>10}{losses_str}" + " " * 10
+        pbar.set_description(
+            ("%22s" + "%11s" * 5)
+            % (
+                "",
+                mse_pitch + mse_theta,
+                mse_pitch,
+                mse_theta,
+                targets.shape[0],
+                images.shape[-1],
+            )
         )
 
     return v_loss, v_ploss, v_tloss, mse_pitch, mse_theta
@@ -375,7 +413,7 @@ def run(
 
         # log to wandb
         log_dict = {
-            "metrics/mse_sum": best_mse,
+            "metrics/mse_sum": mse_pitch + mse_theta,
             "metrics/mse_pitch": mse_pitch,
             "metrics/mse_theta": mse_theta,
             "train/total_loss": t_loss,

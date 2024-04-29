@@ -66,7 +66,7 @@ def get_val_rgb_dataloader(
     )
 
 
-def get_train_ir16bit_dataseloader(
+def get_train_ir16bit_dataloader(
     dataset: fo.Dataset,
     imgsz: int,
     batch_size: int = 64,
