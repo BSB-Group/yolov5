@@ -154,8 +154,6 @@ def update(
         t_ploss = (t_ploss * i + _loss_pitch.item()) / (i + 1)
         t_tloss = (t_tloss * i + _loss_theta.item()) / (i + 1)
 
-        title_str = f"{'train':>6}{f'{epoch + 1}/{epochs}':>10}"
-
         mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
         losses_str = f"{t_loss:>12.3g}{t_ploss:>12.3g}{t_tloss:>12.3g}"
         pbar.desc = (
@@ -430,6 +428,7 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
         if ih / h == 2:
             # TODO: fix properly cases where image is smaller than input
             targets[0] = 2 * targets[0] - 0.5
+            y_pitch = 2 * y_pitch - 0.5
 
         gt_points = pitch_theta_to_points(targets[0], targets[1], w=w, h=h)
         gt_mask = get_mask_from_points(
