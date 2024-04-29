@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Union
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -148,6 +149,39 @@ class HorizonModel(BaseModel):
         return (y_pitch, score_pitch), (y_theta, score_theta)
 
     @staticmethod
+    def decode_pitch(offset: float, offset_buffer: float = 0.15):
+        """Decode offset logits to their original values.
+
+        Parameters
+        ----------
+            offset (float): in [0,1] (horizon line center at offset=0.5)
+            offset_buffer (float): bottom of the image and (1 - offset_buffer) is the
+                top of the image. Depends on how the model was trained.
+
+        Returns
+        -------
+            offset in normalised form [0 - offset_buffer, 1 + offset_buffer]
+            where 0 is the bottom of the image and 1 is the top of the image.
+        """
+        adjusted_offset = offset - offset_buffer
+        adjusted_range = 1 - 2 * offset_buffer
+        return adjusted_offset / adjusted_range
+
+    @staticmethod
+    def decode_theta(theta: float):
+        """Decode theta logits to their original values.
+
+        Parameters
+        ----------
+            theta (float): in [0,1] (theta=0 is -pi/2, theta=1 is pi/2)
+
+        Returns
+        -------
+            theta in radians [-pi/2, pi/2]
+        """
+        return theta * np.pi - 0.5 * np.pi
+
+    @staticmethod
     def postprocess_curve_fit(x_pitch: torch.Tensor, x_theta: torch.Tensor):
         """Postprocess classification heads using Gaussian curve fitting.
 
@@ -160,7 +194,6 @@ class HorizonModel(BaseModel):
         Returns:
             tuple: (score_pitch, val_pitch), (score_theta, val_theta)
         """
-        import numpy as np
         from scipy.optimize import curve_fit
 
         # convert to numpy

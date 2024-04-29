@@ -63,7 +63,7 @@ def pitch_theta_to_slope_intercept(pitch: float, theta: float):
     Convert pitch and theta to slope-intercept form of line: m, b.
 
     Args:
-        pitch (float): in [0,1] (pitch=0.25 is bottom, pitch=0.75 is top)
+        pitch (float): in [0,1] (pitch=0.15 is bottom, pitch=0.85 is top)
         theta (float): in [0,1] (theta=0 is -pi/2, theta=1 is pi/2)
 
     Returns:

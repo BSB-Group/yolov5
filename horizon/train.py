@@ -9,14 +9,18 @@ from tqdm import tqdm
 import fiftyone as fo
 from fiftyone import ViewField as F
 
-import pandas as pd
-import plotly.express as px
+import numpy as np
+import cv2
 
 import torch
 from torch.utils.data import DataLoader
 from torch.nn import CrossEntropyLoss, Dropout
 from torch.cuda import amp
 from torch.optim.lr_scheduler import LambdaLR
+
+import wandb
+
+wandb.login()
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
@@ -27,6 +31,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 from utils.general import TQDM_BAR_FORMAT, LOGGER  # noqa: E402
 from utils.torch_utils import smart_optimizer, ModelEMA  # noqa: E402
 from utils.downloads import attempt_download  # noqa: E402
+from utils.horizon import pitch_theta_to_points  # noqa: E402
 
 from models.custom import HorizonModel  # noqa: E402
 from horizon.dataloaders import (  # noqa: E402
@@ -51,6 +56,7 @@ def get_dataloaders(
                 fo.load_dataset(dataset_name)
                 .match(F(field) == [False])
                 .match_tags(train_tag)
+                # .take(5000, seed=51)
             ),
             imgsz=imgsz,
             batch_size=64 if imgsz == 640 else 16,
@@ -72,6 +78,7 @@ def get_dataloaders(
                 fo.load_dataset(dataset_name)
                 .match(F(field) == [False])
                 .match_tags(train_tag)
+                # .take(1000, seed=51)
             ),
             imgsz=imgsz,
         )
@@ -81,6 +88,7 @@ def get_dataloaders(
                 fo.load_dataset(dataset_name)
                 .match(F(field) == [False])
                 .match_tags(val_tag)
+                # .take(1000, seed=51)
             ),
             imgsz=imgsz,
         )
@@ -118,7 +126,9 @@ def update(
         images, targets = images.to(model.device), targets.to(model.device)
 
         # process targets
-        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
+        pitch_i, theta_i = model.to_discrete(
+            pitch=targets[..., 0], theta=targets[..., 1]
+        )
 
         # forward
         x_pitch, x_theta = model(images)
@@ -143,6 +153,8 @@ def update(
         t_loss = (t_loss * i + loss.item()) / (i + 1)  # update mean losses
         t_ploss = (t_ploss * i + _loss_pitch.item()) / (i + 1)
         t_tloss = (t_tloss * i + _loss_theta.item()) / (i + 1)
+
+        title_str = f"{'train':>6}{f'{epoch + 1}/{epochs}':>10}"
 
         mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
         losses_str = f"{t_loss:>12.3g}{t_ploss:>12.3g}{t_tloss:>12.3g}"
@@ -189,7 +201,9 @@ def evaluate(
             x_pitch, x_theta = ema.ema(images)
 
         # process targets
-        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
+        pitch_i, theta_i = model.to_discrete(
+            pitch=targets[..., 0], theta=targets[..., 1]
+        )
 
         # store losses
         _loss_pitch = loss_pitch(x_pitch, pitch_i)
@@ -228,7 +242,6 @@ def run(
     dropout: float = 0.25,  # dropout rate for classification heads
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
 ):
-
     # create dir to store checkpoints
     ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -246,6 +259,7 @@ def run(
             m.p = dropout  # set dropout
     for p in model.parameters():
         p.requires_grad = True  # all params trainable
+    model.imgsz = imgsz
     LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
 
     # load dataloaders
@@ -268,14 +282,30 @@ def run(
     scaler = amp.GradScaler(enabled=model.device != "cpu")
 
     ema = ModelEMA(model)
-    best_loss = 1e10
     best_mse = 1e10
 
     model.info()
     LOGGER.info("Starting training...\n")
-    train_losses = dict(pitch=[], theta=[], total=[])
-    val_losses = dict(pitch=[], theta=[], total=[])
-    mses = dict(pitch=[], theta=[])
+
+    wandb.init(
+        project="yolo-horizon",
+        entity="sea-ai",
+        job_type="training",
+        config={
+            "dataset_name": dataset_name,
+            "train_tag": train_tag,
+            "val_tag": val_tag,
+            "weights": weights,
+            "nc_pitch": nc_pitch,
+            "nc_theta": nc_theta,
+            "pitch_weight": pitch_weight,
+            "theta_weight": theta_weight,
+            "imgsz": imgsz,
+            "epochs": epochs,
+            "dropout": dropout,
+            "device": device,
+        },
+    )
 
     for epoch in range(epochs):
         t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
@@ -311,20 +341,6 @@ def run(
             epochs,
         )
 
-        if v_loss < best_loss:
-            best_loss = v_loss
-            ckpt = {
-                "epoch": epoch,
-                "model": deepcopy(ema.ema),  # deepcopy(de_parallel(model)).half(),
-                "ema": None,  # deepcopy(ema.ema).half(),
-                "updates": ema.updates,
-                "optimizer": None,  # optimizer.state_dict(),
-                "losses": dict(pitch=v_ploss, theta=v_tloss, total=v_loss),
-                "date": datetime.now().isoformat(),
-            }
-            torch.save(ckpt, ckpt_dir / "best.pt")
-            del ckpt
-
         if mse_pitch + mse_theta < best_mse:
             best_mse = mse_pitch + mse_theta
             ckpt = {
@@ -336,8 +352,14 @@ def run(
                 "losses": dict(pitch=v_ploss, theta=v_tloss, total=v_loss),
                 "date": datetime.now().isoformat(),
             }
-            torch.save(ckpt, ckpt_dir / "best_mse.pt")
+            path = ckpt_dir / "best.pt"
+            torch.save(ckpt, path)
             del ckpt
+
+            wandb.run.summary["best/mse_sum"] = best_mse
+            wandb.run.summary["best/mse_pitch"] = mse_pitch
+            wandb.run.summary["best/mse_theta"] = mse_theta
+            wandb.run.summary["best/epoch"] = epoch
 
         # Save latest checkpoint
         ckpt = {
@@ -349,41 +371,109 @@ def run(
             "losses": dict(pitch=v_ploss, theta=v_tloss, total=v_loss),
             "date": datetime.now().isoformat(),
         }
-        torch.save(ckpt, ckpt_dir / "last.pt")
+        path = ckpt_dir / "last.pt"
+        torch.save(ckpt, path)
         del ckpt
 
-        # plot losses
-        train_losses["pitch"].append(t_ploss)
-        train_losses["theta"].append(t_tloss)
-        train_losses["total"].append(t_loss)
-        val_losses["pitch"].append(v_ploss)
-        val_losses["theta"].append(v_tloss)
-        val_losses["total"].append(v_loss)
-        mses["pitch"].append(mse_pitch)
-        mses["theta"].append(mse_theta)
-        plot_losses(ckpt_dir, train_losses, val_losses, mses)
+        # log to wandb
+        log_dict = {
+            "metrics/mse_sum": best_mse,
+            "metrics/mse_pitch": mse_pitch,
+            "metrics/mse_theta": mse_theta,
+            "train/total_loss": t_loss,
+            "train/pitch_loss": t_ploss,
+            "train/theta_loss": t_tloss,
+            "val/total_loss": v_loss,
+            "val/pitch_loss": v_ploss,
+            "val/theta_loss": v_tloss,
+        }
 
+        if epoch % 5 == 0:
+            log_dict["predictions"] = get_wb_images(model, val_dataloader, n=10)
 
-def plot_losses(ckpt_dir, train_losses, val_losses, mses):
-    fig_train = px.line(
-        pd.DataFrame(train_losses),
-        labels={"x": "epoch", "y": "loss"},
-        title="Training Loss",
-    )
-    fig_val = px.line(
-        pd.DataFrame(val_losses),
-        labels={"x": "epoch", "y": "loss"},
-        title="Validation Loss",
-    )
-    fig_mse = px.line(
-        pd.DataFrame(mses),
-        labels={"x": "epoch", "y": "mse"},
-        title="Mean Squared Error",
+        wandb.run.log(log_dict)
+
+    wandb.run.log_model(
+        name=f"yolov5h-{wandb.run.id}",
+        path=str(ckpt_dir / "best.pt"),
+        aliases=["best"],
     )
 
-    fig_train.write_image(str(ckpt_dir / "train_losses.png"))
-    fig_val.write_image(str(ckpt_dir / "val_losses.png"))
-    fig_mse.write_image(str(ckpt_dir / "mse.png"))
+    wandb.run.log_model(
+        name=f"yolov5h-{wandb.run.id}",
+        path=str(ckpt_dir / "last.pt"),
+        aliases=["latest", "last"],
+    )
+
+    wandb.run.finish()
+
+
+def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
+    rng = np.random.default_rng(seed=42)
+    indices = rng.choice(len(dataloader.dataset), size=n, replace=False)
+    model.eval()
+    wb_images = []
+    mask_labels = {0: "background", 1: "horizon"}
+
+    for i in indices:
+        images, targets = dataloader.dataset[i]
+        images = images.unsqueeze(0).to(model.device)
+        with torch.no_grad():
+            x_pitch, x_theta = model(images)
+        (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
+
+        im = remove_black_padding(
+            (images[0, 0, ...] * 255).cpu().numpy().astype(np.uint8)
+        )
+        h, w = im.shape[:2]
+        ih, _ = images.shape[-2:]  # model input size
+        if ih / h == 2:
+            # TODO: fix properly cases where image is smaller than input
+            targets[0] = 2 * targets[0] - 0.5
+
+        gt_points = pitch_theta_to_points(targets[0], targets[1], w=w, h=h)
+        gt_mask = get_mask_from_points(
+            np.array(gt_points).astype(np.int32), im.shape[:2]
+        )
+
+        y_points = pitch_theta_to_points(y_pitch.item(), y_theta.item(), w=w, h=h)
+        y_mask = get_mask_from_points(np.array(y_points).astype(np.int32), im.shape[:2])
+
+        wb_images.append(
+            wandb.Image(
+                data_or_path=im,
+                masks={
+                    "predictions": {"mask_data": y_mask, "class_labels": mask_labels},
+                    "ground_truth": {"mask_data": gt_mask, "class_labels": mask_labels},
+                },
+                caption=dataloader.dataset.filepaths[i],
+            )
+        )
+
+    return wb_images
+
+
+def remove_black_padding(image):
+    # Apply a binary threshold to detect non-black areas
+    _, binary = cv2.threshold(image, 1, 255, cv2.THRESH_BINARY)
+
+    # Find contours
+    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Get the bounding rect of the biggest contour (assumed to be the image content)
+    if contours:
+        contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(contour)
+        cropped_image = image[y : y + h, x : x + w]
+        return cropped_image
+    else:
+        return image  # Return original if no contours found
+
+
+def get_mask_from_points(points, img_shape):
+    mask = np.zeros(img_shape, dtype=np.uint8)
+    cv2.line(mask, points[0], points[1], 1, 4)
+    return mask
 
 
 def parse_args():
