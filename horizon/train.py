@@ -425,7 +425,9 @@ def run(
         }
 
         if epoch % 5 == 0:
-            log_dict["predictions"] = get_wb_images(model, val_dataloader, n=10)
+            log_dict["predictions"] = [
+                wandb.Image(**img) for img in get_wb_images(model, val_dataloader, n=10)
+            ]
 
         wandb.run.log(log_dict)
 
@@ -449,7 +451,7 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
     indices = rng.choice(len(dataloader.dataset), size=n, replace=False)
     model.eval()
     wb_images = []
-    mask_labels = {0: "background", 1: "horizon"}
+    mask_labels = {0: "background", 1: "horizon"}  # keys are class indices (pixel values)
 
     for i in indices:
         images, targets = dataloader.dataset[i]
@@ -457,27 +459,29 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
         with torch.no_grad():
             x_pitch, x_theta = model(images)
         (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
+        y_pitch, y_theta = y_pitch.cpu().numpy(), y_theta.cpu().numpy()
 
-        im = remove_black_padding(
+        im = remove_black_padding(  # hack until dataloader is enhanced
             (images[0, 0, ...] * 255).cpu().numpy().astype(np.uint8)
         )
-        h, w = im.shape[:2]
-        ih, _ = images.shape[-2:]  # model input size
-        if ih / h == 2:
-            # TODO: fix properly cases where image is smaller than input
-            targets[0] = 2 * targets[0] - 0.5
-            y_pitch = 2 * y_pitch - 0.5
 
-        gt_points = pitch_theta_to_points(targets[0], targets[1], w=w, h=h)
-        gt_mask = get_mask_from_points(
-            np.array(gt_points).astype(np.int32), im.shape[:2]
+        gt_points = pitch_theta_to_points(
+            targets[0], targets[1], input_hw=images.shape[-2:], orig_hw=im.shape[:2]
         )
+        gt_mask = np.zeros(im.shape, dtype=np.uint8)  # 0=background, 1=horizon
+        cv2.line(gt_mask, gt_points[0], gt_points[1],color= 1, thickness=4)
 
-        y_points = pitch_theta_to_points(y_pitch.item(), y_theta.item(), w=w, h=h)
-        y_mask = get_mask_from_points(np.array(y_points).astype(np.int32), im.shape[:2])
+        y_points = pitch_theta_to_points(
+            y_pitch.item(),
+            y_theta.item(),
+            input_hw=images.shape[-2:],
+            orig_hw=im.shape[:2],
+        )
+        y_mask = np.zeros(im.shape, dtype=np.uint8)  # 0=background, 1=horizon
+        cv2.line(y_mask, y_points[0], y_points[1], color=1, thickness=4)
 
         wb_images.append(
-            wandb.Image(
+            dict(
                 data_or_path=im,
                 masks={
                     "predictions": {"mask_data": y_mask, "class_labels": mask_labels},
@@ -505,12 +509,6 @@ def remove_black_padding(image):
         return cropped_image
     else:
         return image  # Return original if no contours found
-
-
-def get_mask_from_points(points, img_shape):
-    mask = np.zeros(img_shape, dtype=np.uint8)
-    cv2.line(mask, points[0], points[1], 1, 4)
-    return mask
 
 
 def parse_args():

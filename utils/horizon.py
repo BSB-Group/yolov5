@@ -1,3 +1,4 @@
+from typing import Tuple
 import cv2
 import numpy as np
 import torch
@@ -79,21 +80,64 @@ def pitch_theta_to_slope_intercept(pitch: float, theta: float):
     return m, b
 
 
-def pitch_theta_to_points(pitch: float, theta: float, w: int = 1, h: int = 1):
+def pitch_theta_to_points(pitch: float, theta: float, input_hw, orig_hw):
     """
     Convert pitch and theta to two points.
 
     Args:
         pitch (float): in [0,1] (pitch=0.25 is bottom, pitch=0.75 is top)
         theta (float): in [0,1] (theta=0 is -pi/2, theta=1 is pi/2)
+        input_hw (tuple): input height and width
+        orig_hw (tuple): original height and width
 
     Returns:
         (x1, y1), (x2, y2)
     """
     m, b = pitch_theta_to_slope_intercept(pitch, theta)
-    (x1, y1), (x2, y2) = slope_intercept_to_points(m, b, w, h)
-    y1, y2 = h - y1, h - y2  # invert y-axis since origin is top left corner
+    points = slope_intercept_to_points(m, b, input_hw[1], input_hw[0])
+    points = scale_line_edges(np.array([points]).flatten(), input_hw, orig_hw, upscale=False)
+    (x1, y1), (x2, y2) = points.reshape(-1, 2)
+    y1, y2 = orig_hw[0] - y1, orig_hw[0] - y2
     return (x1, y1), (x2, y2)
+
+
+def scale_line_edges(
+    line_edges: np.ndarray,
+    from_shape: Tuple[int, int],
+    to_shape: Tuple[int, int],
+    upscale: bool = True,
+) -> np.ndarray:
+    """Rescale bounding boxes from from_shape to to_shape.
+
+    Parameters
+    ----------
+    bboxes : np.ndarray (N, 4)
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
+    from_shape : tuple (2,)
+        original shape of the image (height, width)
+    to_shape : tuple (2,)
+        target shape of the image (height, width)
+    upscale : bool
+        whether to upscale the bounding boxes
+
+    Returns
+    -------
+    np.ndarray (N, 4)
+        bounding boxes as (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
+    """
+    # gain  = old / new
+    gain = min(from_shape[0] / to_shape[0], from_shape[1] / to_shape[1])
+    gain = min(gain, 1) if not upscale else gain
+    # wh padding
+    pad = (
+        (from_shape[1] - to_shape[1] * gain) / 2,  # x padding
+        (from_shape[0] - to_shape[0] * gain) / 2,
+    )  # y padding
+
+    line_edges[..., [0, 2]] -= pad[0]  # x padding
+    line_edges[..., [1, 3]] -= pad[1]  # y padding
+    line_edges[..., :4] /= gain
+    return line_edges
 
 
 def slope_intercept_to_points(m: float, b: float, w: int = 1, h: int = 1):
@@ -173,7 +217,7 @@ def draw_horizon(
 
     if pitch_theta is not None:
         (x1, y1), (x2, y2) = pitch_theta_to_points(
-            *pitch_theta, image.shape[1], image.shape[0]
+            *pitch_theta, image.shape, image.shape
         )
 
     if hough is not None:
