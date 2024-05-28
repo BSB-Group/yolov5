@@ -1,3 +1,14 @@
+"""
+Train horizon model on RGB or IR16bit images.
+
+Example:
+    CUDA_VISIBLE_DEVICES=1 python3 horizon/train.py \
+        --dataset_name "TRAIN_RL_SPLIT_THERMAL_2024_03" \
+        --train_tag "TRAIN_per_sequence" \
+        --val_tag "VAL_per_sequence" \
+        --device 0
+"""
+
 import os
 import sys
 import argparse
@@ -109,7 +120,7 @@ def update(
     epoch: int,
     epochs: int,
 ):
-    """Update model weights via backpropagation."""
+    """Update model weights via back-propagation."""
 
     # initialize mean losses
     t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
@@ -189,9 +200,7 @@ def evaluate(
     loss_theta: CrossEntropyLoss,
     pitch_weight: float,
     theta_weight: float,
-    ema: ModelEMA,
-    epoch: int,
-    epochs: int,
+    ema: ModelEMA
 ):
     """Evaluate model on validation set."""
 
@@ -372,9 +381,7 @@ def run(
             loss_theta,
             pitch_weight,
             theta_weight,
-            ema,
-            epoch,
-            epochs,
+            ema
         )
 
         if mse_pitch + mse_theta < best_mse:
@@ -447,6 +454,9 @@ def run(
 
 
 def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
+    """
+    Get n images with predictions and ground truth for wandb logging.
+    """
     rng = np.random.default_rng(seed=42)
     indices = rng.choice(len(dataloader.dataset), size=n, replace=False)
     model.eval()
@@ -500,6 +510,10 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
 
 
 def remove_black_padding(image):
+    """
+    Remove black padding from an image.
+    """
+    
     # Apply a binary threshold to detect non-black areas
     _, binary = cv2.threshold(image, 1, 255, cv2.THRESH_BINARY)
 
@@ -517,6 +531,9 @@ def remove_black_padding(image):
 
 
 def parse_args():
+    """
+    Parse command line arguments.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, help="dataset name", required=True)
     parser.add_argument("--train_tag", type=str, default="train", help="train tag")
