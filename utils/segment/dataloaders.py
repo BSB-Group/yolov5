@@ -15,8 +15,9 @@ from ..general import LOGGER, xyn2xy, xywhn2xyxy, xyxy2xywhn
 from ..torch_utils import torch_distributed_zero_first
 from .augmentations import mixup, random_perspective
 
-RANK = int(os.getenv('RANK', -1))
-FILL_VALUE = 0 # 114
+RANK = int(os.getenv("RANK", -1))
+FILL_VALUE = 0  # 114
+
 
 def create_dataloader(
     path,
@@ -66,7 +67,9 @@ def create_dataloader(
     nd = torch.cuda.device_count()  # number of CUDA devices
     nw = min([os.cpu_count() // max(nd, 1), batch_size if batch_size > 1 else 0, workers])  # number of workers
     sampler = None if rank == -1 else SmartDistributedSampler(dataset, shuffle=shuffle)
-    loader = DataLoader if image_weights or close_mosaic else InfiniteDataLoader  # only DataLoader allows for attribute updates
+    loader = (
+        DataLoader if image_weights or close_mosaic else InfiniteDataLoader
+    )  # only DataLoader allows for attribute updates
     generator = torch.Generator()
     generator.manual_seed(6148914691236517205 + seed + RANK)
     return loader(

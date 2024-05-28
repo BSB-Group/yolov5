@@ -171,10 +171,23 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
     check_requirements("onnx>=1.12.0")
     import onnx
 
+    from models.custom import AHOY, DAN
+
     LOGGER.info(f"\n{prefix} starting export with onnx {onnx.__version__}...")
     f = str(file.with_suffix(".onnx"))
 
-    output_names = ["output0", "output1"] if isinstance(model, SegmentationModel) else ["output0"]
+    if isinstance(model, SegmentationModel):
+        input_names = ["images"]
+        output_names = ["output0", "output1"]
+    elif isinstance(model, AHOY):
+        input_names = ["images"]
+        output_names = ["output0", "output1", "output2"]
+    elif isinstance(model, DAN):
+        input_names = ["images_a", "images_b"]
+        output_names = ["output_a0", "output_a1", "output_a2", "output_b0", "output_b1", "output_b2"]
+    else:
+        input_names = ["images"]
+        output_names = ["output0"]
     if dynamic:
         dynamic = {"images": {0: "batch", 2: "height", 3: "width"}}  # shape(1,3,640,640)
         if isinstance(model, SegmentationModel):
@@ -182,15 +195,21 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
             dynamic["output1"] = {0: "batch", 2: "mask_height", 3: "mask_width"}  # shape(1,32,160,160)
         elif isinstance(model, DetectionModel):
             dynamic["output0"] = {0: "batch", 1: "anchors"}  # shape(1,25200,85)
+        elif isinstance(model, (AHOY, DAN)):
+            raise NotImplementedError(f"Dynamic export not supported for {model.__class__.__name__}")
 
+    if isinstance(im, (list, tuple)):
+        args = tuple(i.cpu() if dynamic else i for i in im)
+    else:
+        args = im.cpu() if dynamic else im
     torch.onnx.export(
         model.cpu() if dynamic else model,  # --dynamic only compatible with cpu
-        im.cpu() if dynamic else im,
+        args,
         f,
         verbose=False,
         opset_version=opset,
         do_constant_folding=True,  # WARNING: DNN inference with torch>=1.12 may require do_constant_folding=False
-        input_names=["images"],
+        input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic or None,
     )
@@ -200,7 +219,13 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
     onnx.checker.check_model(model_onnx)  # check onnx model
 
     # Metadata
-    d = {"stride": int(max(model.stride)), "names": model.names}
+    if isinstance(model, DAN):
+        d = {
+            "stride": [int(max(model.model_a.stride)), int(max(model.model_b.stride))],
+            "names": [model.model_a.names, model.model_b.names],
+        }
+    else:
+        d = {"stride": int(max(model.stride)), "names": model.names}
     for k, v in d.items():
         meta = model_onnx.metadata_props.add()
         meta.key, meta.value = k, str(v)
@@ -327,19 +352,40 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
 
     https://developer.nvidia.com/tensorrt
     """
-    assert im.device.type != "cpu", "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
+    if isinstance(im, (list, tuple)):
+        assert all(
+            i.device.type != "cpu" for i in im
+        ), "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
+    else:
+        assert im.device.type != "cpu", "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
     try:
         import tensorrt as trt
+
+        from models.custom import AHOY, DAN
     except Exception:
         if platform.system() == "Linux":
             check_requirements("nvidia-tensorrt", cmds="-U --index-url https://pypi.ngc.nvidia.com")
         import tensorrt as trt
 
     if trt.__version__[0] == "7":  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
-        grid = model.model[-1].anchor_grid
-        model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
-        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
-        model.model[-1].anchor_grid = grid
+        if isinstance(model, AHOY):
+            grid = model.obj_det.model[-1].anchor_grid
+            model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
+            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+            model.obj_det.model[-1].anchor_grid = grid
+        elif isinstance(model, DAN):
+            grid_a = model.model_a.obj_det.model[-1].anchor_grid
+            model.model_a.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_a]
+            grid_b = model.model_b.obj_det.model[-1].anchor_grid
+            model.model_b.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_b]
+            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+            model.model_a.obj_det.model[-1].anchor_grid = grid_a
+            model.model_b.obj_det.model[-1].anchor_grid = grid_b
+        else:
+            grid = model.model[-1].anchor_grid
+            model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
+            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+            model.model[-1].anchor_grid = grid
     else:  # TensorRT >= 8
         check_version(trt.__version__, "8.0.0", hard=True)  # require tensorrt>=8.0.0
         export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12

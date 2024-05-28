@@ -88,21 +88,27 @@ class Loggers:
         iouv_end = 0.95 if "iouv_end" not in hyp else hyp["iouv_end"]
 
         self.keys = [
-            'train/box_loss',
-            'train/obj_loss',
-            'train/cls_loss',  # train loss
-            'metrics/precision',
-            'metrics/recall',
-            f'metrics/mAP_{iouv_start}',
-            f'metrics/mAP_{iouv_start}:{iouv_end}',  # metrics
-            'val/box_loss',
-            'val/obj_loss',
-            'val/cls_loss',  # val loss
-            'x/lr0',
-            'x/lr1',
-            'x/lr2'
+            "train/box_loss",
+            "train/obj_loss",
+            "train/cls_loss",  # train loss
+            "metrics/precision",
+            "metrics/recall",
+            f"metrics/mAP_{iouv_start}",
+            f"metrics/mAP_{iouv_start}:{iouv_end}",  # metrics
+            "val/box_loss",
+            "val/obj_loss",
+            "val/cls_loss",  # val loss
+            "x/lr0",
+            "x/lr1",
+            "x/lr2",
         ]  # params
-        self.best_keys = ['best/epoch', 'best/precision', 'best/recall', f'best/mAP_{iouv_start}', f'best/mAP_{iouv_start}:{iouv_end}']
+        self.best_keys = [
+            "best/epoch",
+            "best/precision",
+            "best/recall",
+            f"best/mAP_{iouv_start}",
+            f"best/mAP_{iouv_start}:{iouv_end}",
+        ]
         for k in LOGGERS:
             setattr(self, k, None)  # init empty logger dictionary
         self.csv = True  # always log to csv
