@@ -5,8 +5,9 @@ https://github.com/NVIDIA/object-detection-tensorrt-example/blob/master/SSD_Mode
 """
 
 import json
-import tensorrt as trt
+
 import pycuda.driver as cuda
+import tensorrt as trt
 
 
 class HostDeviceMem(object):
@@ -37,7 +38,8 @@ class HostDeviceMem(object):
 
 
 def allocate_buffers(engine):
-    """Allocates host and device buffer for TRT engine inference.
+    """
+    Allocates host and device buffer for TRT engine inference.
 
     Args:
         engine (trt.ICudaEngine): TensorRT engine
@@ -82,9 +84,7 @@ def load_engine(engine_path, logger=trt.Logger):
     """Loads a serialized engine from a file."""
     with open(engine_path, "rb") as f, trt.Runtime(logger) as runtime:
         if "yolov8" in engine_path:
-            meta_len = int.from_bytes(
-                f.read(4), byteorder="little"
-            )  # read metadata length
+            meta_len = int.from_bytes(f.read(4), byteorder="little")  # read metadata length
             metadata = json.loads(f.read(meta_len).decode("utf-8"))
             print("metadata:", metadata)
         engine = runtime.deserialize_cuda_engine(f.read())
@@ -94,6 +94,7 @@ def load_engine(engine_path, logger=trt.Logger):
 def do_inference(context, bindings, inputs, outputs, stream):
     """
     This function is generalized for multiple inputs/outputs.
+
     inputs and outputs are expected to be lists of HostDeviceMem objects.
     """
     # Transfer input data to the GPU.

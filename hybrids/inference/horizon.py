@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def points_to_normal(x_1, y_1, x_2, y_2):
     """Convert two points to normal form of line: rho, theta."""
     if x_1 == x_2:  # vertical line
@@ -22,9 +23,8 @@ def points_to_slope_intercept(x_1, y_1, x_2, y_2):
 
 def normal_to_points(rho, theta, h=1, w=1):
     """
-    Convert normal form of line to two points.
-    Points are located on the image border.
-    Points are normalised unless h and w are provided.
+    Convert normal form of line to two points. Points are located on the image border. Points are normalised unless h
+    and w are provided.
 
     normal from --> slope-intercept form --> points.
     """

@@ -6,37 +6,31 @@ TODO: add metadata to model file:
     - classes_names
 """
 
-import os
 import logging
-from typing import Union, Sequence, List
+import os
 from pathlib import Path
-import yaml
+from typing import List, Sequence, Union
+
 import numpy as np
+import yaml
+
+from .misc import Profile
+from .postprocessing import postprocess_ahoy, xyxy_to_xyxyn
 
 # import pycuda.autoinit  # cuda context initialized manually in __init__
-
 from .preprocessing import preprocess_yolo, resize_and_center_images_in_batch
-from .postprocessing import xyxy_to_xyxyn, postprocess_ahoy
-from .misc import Profile
 
 logger = logging.getLogger(__name__)
 
 
 def load_labels(label_path):
-    """
-    Load label mapping from file.
-    """
+    """Load label mapping from file."""
     with open(label_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 class AHOYv5:
-    """
-    A
-    Horizon and
-    Object detection based on
-    YOLOv5.
-    """
+    """A Horizon and Object detection based on YOLOv5."""
 
     def __init__(self, model_path: str, device: int = 0) -> None:
         """
@@ -144,8 +138,8 @@ class AHOYv5:
 
     def preprocess_yolo(self, ims: np.array) -> np.ndarray:
         """
-        Transform the input image so that the model can infer from it.
-        Letterbox, 0-1 normalization, and NHWC to NCHW conversion.
+        Transform the input image so that the model can infer from it. Letterbox, 0-1 normalization, and NHWC to NCHW
+        conversion.
 
         Parameters
         ----------
@@ -161,9 +155,8 @@ class AHOYv5:
 
     def preprocess_fast(self, ims: np.array) -> np.ndarray:
         """
-        Transform the input image so that the model can infer from it.
-        This runs under the assumption that input images have a constant size
-        throughout the pipeline.
+        Transform the input image so that the model can infer from it. This runs under the assumption that input images
+        have a constant size throughout the pipeline.
 
         Parameters
         ----------
@@ -224,7 +217,7 @@ class AHOYv5:
         )
 
     def predict(self, img, conf_thresh, iou_thresh, do_curve_fit=True):
-        """shortcut for detect() with output_mode="qa" """
+        """Shortcut for detect() with output_mode="qa"."""
         return self.detect(
             img,
             output_mode="qa",
@@ -316,6 +309,7 @@ class AHOYv5:
     def to_qa(bboxes, scores, classes, orig_shape, cls_map) -> List[List[list]]:
         """
         Named 'qa' for some historical reason since the QA department used this format.
+
         Format is [[[y1, x1, y2, x2], class_name, class_id, score], ...]
         """
         if not cls_map:
@@ -323,9 +317,7 @@ class AHOYv5:
         proposals = []
         for bbs, scs, cls in zip(bboxes, scores, classes):
             bbs = xyxy_to_xyxyn(bbs, orig_shape)
-            proposals.append(
-                [[b, cls_map[c], int(c), s] for b, s, c in zip(bbs, scs, cls)]
-            )
+            proposals.append([[b, cls_map[c], int(c), s] for b, s, c in zip(bbs, scs, cls)])
         return proposals
 
     def close(self):

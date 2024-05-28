@@ -9,27 +9,24 @@ Example:
         --device 0
 """
 
+import argparse
 import os
 import sys
-import argparse
-from pathlib import Path
-from datetime import datetime
 from copy import deepcopy
-from tqdm import tqdm
+from datetime import datetime
+from pathlib import Path
 
-import fiftyone as fo
-from fiftyone import ViewField as F
-
-import numpy as np
 import cv2
-
+import fiftyone as fo
+import numpy as np
 import torch
-from torch.utils.data import DataLoader
-from torch.nn import CrossEntropyLoss, Dropout
-from torch.cuda import amp
-from torch.optim.lr_scheduler import LambdaLR
-
 import wandb
+from fiftyone import ViewField as F
+from torch.cuda import amp
+from torch.nn import CrossEntropyLoss, Dropout
+from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 wandb.login()
 
@@ -39,18 +36,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-from utils.general import TQDM_BAR_FORMAT, LOGGER  # noqa: E402
-from utils.torch_utils import smart_optimizer, ModelEMA  # noqa: E402
-from utils.downloads import attempt_download  # noqa: E402
-from utils.horizon import pitch_theta_to_points  # noqa: E402
-
-from models.custom import HorizonModel  # noqa: E402
 from horizon.dataloaders import (  # noqa: E402
-    get_train_rgb_dataloader,
-    get_val_rgb_dataloader,
     get_train_ir16bit_dataloader,
+    get_train_rgb_dataloader,
     get_val_ir16bit_dataloader,
+    get_val_rgb_dataloader,
 )
+from models.custom import HorizonModel  # noqa: E402
+from utils.downloads import attempt_download  # noqa: E402
+from utils.general import LOGGER, TQDM_BAR_FORMAT  # noqa: E402
+from utils.horizon import pitch_theta_to_points  # noqa: E402
+from utils.torch_utils import ModelEMA, smart_optimizer  # noqa: E402
 
 
 def get_dataloaders(
@@ -64,9 +60,7 @@ def get_dataloaders(
     if "RGB" in dataset_name:
         train_dataloader = get_train_rgb_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name)
-                .match(F(field) == [False])
-                .match_tags(train_tag)
+                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(train_tag)
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
@@ -75,9 +69,7 @@ def get_dataloaders(
 
         val_dataloader = get_val_rgb_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name)
-                .match(F(field) == [False])
-                .match_tags(val_tag)
+                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(val_tag)
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
@@ -86,9 +78,7 @@ def get_dataloaders(
     else:
         train_dataloader = get_train_ir16bit_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name)
-                .match(F(field) == [False])
-                .match_tags(train_tag)
+                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(train_tag)
                 # .take(1000, seed=51)
             ),
             imgsz=imgsz,
@@ -96,9 +86,7 @@ def get_dataloaders(
 
         val_dataloader = get_val_ir16bit_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name)
-                .match(F(field) == [False])
-                .match_tags(val_tag)
+                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(val_tag)
                 # .take(1000, seed=51)
             ),
             imgsz=imgsz,
@@ -148,9 +136,7 @@ def update(
         images, targets = images.to(model.device), targets.to(model.device)
 
         # process targets
-        pitch_i, theta_i = model.to_discrete(
-            pitch=targets[..., 0], theta=targets[..., 1]
-        )
+        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
 
         # forward
         x_pitch, x_theta = model(images)
@@ -163,9 +149,7 @@ def update(
 
         # Optimize
         scaler.unscale_(optimizer)  # unscale gradients
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(), max_norm=10.0
-        )  # clip gradients
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)  # clip gradients
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
@@ -200,7 +184,7 @@ def evaluate(
     loss_theta: CrossEntropyLoss,
     pitch_weight: float,
     theta_weight: float,
-    ema: ModelEMA
+    ema: ModelEMA,
 ):
     """Evaluate model on validation set."""
 
@@ -236,9 +220,7 @@ def evaluate(
             x_pitch, x_theta = ema.ema(images)
 
         # process targets
-        pitch_i, theta_i = model.to_discrete(
-            pitch=targets[..., 0], theta=targets[..., 1]
-        )
+        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
 
         # store losses
         _loss_pitch = loss_pitch(x_pitch, pitch_i)
@@ -251,12 +233,8 @@ def evaluate(
 
         # update running mean of MSE
         (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
-        mse_pitch = (
-            mse_pitch * i + criterion_pitch(y_pitch, targets[..., 0]).item()
-        ) / (i + 1)
-        mse_theta = (
-            mse_theta * i + criterion_theta(y_theta, targets[..., 1]).item()
-        ) / (i + 1)
+        mse_pitch = (mse_pitch * i + criterion_pitch(y_pitch, targets[..., 0]).item()) / (i + 1)
+        mse_theta = (mse_theta * i + criterion_theta(y_theta, targets[..., 1]).item()) / (i + 1)
 
         pbar.set_description(
             ("%22s" + "%11.4g" * 5)
@@ -308,14 +286,10 @@ def run(
     LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
 
     # load dataloaders
-    train_dataloader, val_dataloader = get_dataloaders(
-        dataset_name, train_tag, val_tag, imgsz
-    )
+    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz)
     LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
 
-    optimizer = smart_optimizer(
-        model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001
-    )
+    optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
 
     lrf = 0.001  # final lr (fraction of lr0)
     lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
@@ -375,13 +349,7 @@ def run(
 
         model.eval()
         v_loss, v_ploss, v_tloss, mse_pitch, mse_theta = evaluate(
-            model,
-            val_dataloader,
-            loss_pitch,
-            loss_theta,
-            pitch_weight,
-            theta_weight,
-            ema
+            model, val_dataloader, loss_pitch, loss_theta, pitch_weight, theta_weight, ema
         )
 
         if mse_pitch + mse_theta < best_mse:
@@ -432,9 +400,7 @@ def run(
         }
 
         if epoch % 5 == 0:
-            log_dict["predictions"] = [
-                wandb.Image(**img) for img in get_wb_images(model, val_dataloader, n=10)
-            ]
+            log_dict["predictions"] = [wandb.Image(**img) for img in get_wb_images(model, val_dataloader, n=10)]
 
         wandb.run.log(log_dict)
 
@@ -454,9 +420,7 @@ def run(
 
 
 def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
-    """
-    Get n images with predictions and ground truth for wandb logging.
-    """
+    """Get n images with predictions and ground truth for wandb logging."""
     rng = np.random.default_rng(seed=42)
     indices = rng.choice(len(dataloader.dataset), size=n, replace=False)
     model.eval()
@@ -478,9 +442,7 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
             (images[0, 0, ...] * 255).cpu().numpy().astype(np.uint8)
         )
 
-        gt_points = pitch_theta_to_points(
-            targets[0], targets[1], input_hw=images.shape[-2:], orig_hw=im.shape[:2]
-        )
+        gt_points = pitch_theta_to_points(targets[0], targets[1], input_hw=images.shape[-2:], orig_hw=im.shape[:2])
         gt_points = np.array(gt_points).astype(np.int32)
         gt_mask = np.zeros(im.shape, dtype=np.uint8)  # 0=background, 1=horizon
         cv2.line(gt_mask, gt_points[0], gt_points[1], color=1, thickness=4)
@@ -510,10 +472,8 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
 
 
 def remove_black_padding(image):
-    """
-    Remove black padding from an image.
-    """
-    
+    """Remove black padding from an image."""
+
     # Apply a binary threshold to detect non-black areas
     _, binary = cv2.threshold(image, 1, 255, cv2.THRESH_BINARY)
 
@@ -531,28 +491,16 @@ def remove_black_padding(image):
 
 
 def parse_args():
-    """
-    Parse command line arguments.
-    """
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, help="dataset name", required=True)
     parser.add_argument("--train_tag", type=str, default="train", help="train tag")
     parser.add_argument("--val_tag", type=str, default="val", help="val tag")
-    parser.add_argument(
-        "--weights", type=str, default="yolov5n.pt", help="initial weights path"
-    )
-    parser.add_argument(
-        "--nc_pitch", type=int, default=500, help="number of pitch classes"
-    )
-    parser.add_argument(
-        "--nc_theta", type=int, default=500, help="number of theta classes"
-    )
-    parser.add_argument(
-        "--pitch_weight", type=float, default=1.0, help="pitch loss weight"
-    )
-    parser.add_argument(
-        "--theta_weight", type=float, default=1.0, help="theta loss weight"
-    )
+    parser.add_argument("--weights", type=str, default="yolov5n.pt", help="initial weights path")
+    parser.add_argument("--nc_pitch", type=int, default=500, help="number of pitch classes")
+    parser.add_argument("--nc_theta", type=int, default=500, help="number of theta classes")
+    parser.add_argument("--pitch_weight", type=float, default=1.0, help="pitch loss weight")
+    parser.add_argument("--theta_weight", type=float, default=1.0, help="theta loss weight")
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")

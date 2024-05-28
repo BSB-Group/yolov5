@@ -1,4 +1,5 @@
 from typing import Tuple
+
 import cv2
 import numpy as np
 import torch
@@ -18,7 +19,8 @@ def postprocess_x_pitch_theta(x_pitch, x_theta):
 
 
 def points_to_pitch_theta(x1: float, y1: float, x2: float, y2: float):
-    """Parametrize line that is spanned by the two points (x1, y1) and (x2, y2) through pitch and theta
+    """
+    Parametrize line that is spanned by the two points (x1, y1) and (x2, y2) through pitch and theta.
 
        - pitch ... y-value of line where x=0.5 (pitch=0 is at the bottom, pitch=1 is at the top)
        - theta ... angle between line and y=0.5 (aka horizontal line)
@@ -37,9 +39,7 @@ def points_to_pitch_theta(x1: float, y1: float, x2: float, y2: float):
         pitch (float): in [0,1] (pitch=0.25 is bottom, pitch=0.75 is top)
         theta (float): in [0,1] (theta=0 is -pi/2, theta=1 is pi/2)
     """
-    assert (
-        x1 != x2
-    ), "Line is not allowed to be perfectly vertical or pitch would be infinite"
+    assert x1 != x2, "Line is not allowed to be perfectly vertical or pitch would be infinite"
 
     if x1 > x2:  # make sure x1 < x2
         x1, y1, x2, y2 = x2, y2, x1, y1
@@ -107,7 +107,8 @@ def scale_line_edges(
     to_shape: Tuple[int, int],
     upscale: bool = True,
 ) -> np.ndarray:
-    """Rescale bounding boxes from from_shape to to_shape.
+    """
+    Rescale bounding boxes from from_shape to to_shape.
 
     Parameters
     ----------
@@ -172,9 +173,8 @@ def points_to_slope_intercept(x_1, y_1, x_2, y_2):
 
 def hough_to_points(rho, theta, h=1, w=1):
     """
-    Convert hough form of line to two points.
-    Points are located on the image border.
-    Points are normalised unless h and w are provided.
+    Convert hough form of line to two points. Points are located on the image border. Points are normalised unless h and
+    w are provided.
 
     hough form --> slope-intercept form --> points.
     """
@@ -198,12 +198,8 @@ def hough_to_slope_intercept(rho, theta, h=1, w=1):
     return m, b
 
 
-def draw_horizon(
-    image, keypoints=None, pitch_theta=None, hough=None, color=(0, 255, 0), diameter=2
-):
-    """
-    Visualize horizon line on image.
-    """
+def draw_horizon(image, keypoints=None, pitch_theta=None, hough=None, color=(0, 255, 0), diameter=2):
+    """Visualize horizon line on image."""
     assert np.any(
         [arg is not None for arg in [keypoints, pitch_theta, hough]]
     ), "Provide at least one of keypoints, theta_pitch, hough"
@@ -216,9 +212,7 @@ def draw_horizon(
             cv2.circle(image, (int(x), int(y)), diameter * 5, (0, 255, 0), -1)
 
     if pitch_theta is not None:
-        (x1, y1), (x2, y2) = pitch_theta_to_points(
-            *pitch_theta, image.shape, image.shape
-        )
+        (x1, y1), (x2, y2) = pitch_theta_to_points(*pitch_theta, image.shape, image.shape)
 
     if hough is not None:
         (x1, y1), (x2, y2) = hough_to_points(*hough, image.shape[1], image.shape[0])
@@ -228,9 +222,7 @@ def draw_horizon(
 
 
 def draw_bboxes(image, dets, color=(0, 255, 0), thickness=2):
-    """
-    Visualize bounding boxes on image.
-    """
+    """Visualize bounding boxes on image."""
     image = image.copy()
     for det in dets:
         x1, y1, x2, y2 = det[:4]

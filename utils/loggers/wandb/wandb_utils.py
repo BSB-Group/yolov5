@@ -65,7 +65,7 @@ class WandbLogger:
         self.max_imgs_to_log = 16
         self.data_dict = None
         if self.wandb:
-            env_run_id = os.environ.get('RUN_ID')
+            env_run_id = os.environ.get("RUN_ID")
             if env_run_id:
                 run_id = env_run_id
             self.wandb_run = wandb.run or wandb.init(

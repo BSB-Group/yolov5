@@ -20,14 +20,15 @@ Example usage:
         --engine-fname dan.engine
 """
 
-from typing import List, Union, Sequence
 import argparse
 from pathlib import Path
+from typing import List, Sequence, Union
+
 import torch
 
+from export import export_engine
 from models.custom import AHOY, DAN
 from models.yolo import Detect
-from export import export_engine
 
 
 def init_model(
@@ -36,9 +37,7 @@ def init_model(
     half: bool,
     fuse: bool,
 ) -> Union[AHOY, DAN]:
-    """
-    Load the AHOY or DAN model based on the number of weights provided.
-    """
+    """Load the AHOY or DAN model based on the number of weights provided."""
     if len(det_weights) == len(hor_weights) == 1:
         return AHOY(
             obj_det_weigths=det_weights[0],
@@ -67,13 +66,8 @@ def init_model(
 def get_dummy_input(
     batch_size: int, imgsz: int, device: str, fp32=False
 ) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
-    """
-    Create a dummy input image.
-    """
-    dummy_input = [
-        torch.zeros((bs, 3, sz, sz), device=device).byte()
-        for bs, sz in zip(batch_size, imgsz)
-    ]
+    """Create a dummy input image."""
+    dummy_input = [torch.zeros((bs, 3, sz, sz), device=device).byte() for bs, sz in zip(batch_size, imgsz)]
     if fp32:
         dummy_input = [inp.float() for inp in dummy_input]
     if len(dummy_input) == 1:
@@ -98,9 +92,7 @@ def main(
     input_as_fp32: bool = False,
     engine_fname: str = "",
 ):
-    """
-    Export the model to TensorRT engine.
-    """
+    """Export the model to TensorRT engine."""
 
     model = init_model(det_weights, hor_weights, half, fuse)
     if not engine_fname:

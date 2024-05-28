@@ -21,7 +21,6 @@ Usage - formats:
 
 import argparse
 import json
-import yaml
 import os
 import subprocess
 import sys
@@ -29,6 +28,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import yaml
 from tqdm import tqdm
 
 FILE = Path(__file__).resolve()
@@ -153,11 +153,11 @@ def run(
     if model is not None:
         hyp = model.hyp  # hyperparameters
     elif isinstance(hyp, str):
-        with open(hyp, errors='ignore') as f:
+        with open(hyp, errors="ignore") as f:
             hyp = yaml.safe_load(f)  # load hyps dict
-        LOGGER.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
+        LOGGER.info(colorstr("hyperparameters: ") + ", ".join(f"{k}={v}" for k, v in hyp.items()))
     else:
-        LOGGER.info('Hyperparameters missing, default values used.')
+        LOGGER.info("Hyperparameters missing, default values used.")
 
     # Initialize/load model and set device
     training = model is not None
@@ -190,11 +190,11 @@ def run(
 
     # Configure
     model.eval()
-    cuda = device.type != 'cpu'
-    is_coco = isinstance(data.get('val'), str) and data['val'].endswith(f'coco{os.sep}val2017.txt')  # COCO dataset
-    nc = 1 if single_cls else int(data['nc'])  # number of classes
-    iouv_start = 0.5 if (not hyp or 'iouv_start' not in hyp) else hyp['iouv_start']
-    iouv_end = 0.95 if (not hyp or 'iouv_end' not in hyp) else hyp['iouv_end']
+    cuda = device.type != "cpu"
+    is_coco = isinstance(data.get("val"), str) and data["val"].endswith(f"coco{os.sep}val2017.txt")  # COCO dataset
+    nc = 1 if single_cls else int(data["nc"])  # number of classes
+    iouv_start = 0.5 if (not hyp or "iouv_start" not in hyp) else hyp["iouv_start"]
+    iouv_end = 0.95 if (not hyp or "iouv_end" not in hyp) else hyp["iouv_end"]
     iouv = torch.linspace(iouv_start, iouv_end, 10, device=device)  # iou vector for mAP@iouv_start:iouv_end
     niou = iouv.numel()
 
@@ -256,13 +256,15 @@ def run(
         targets[:, 2:] *= torch.tensor((width, height, width, height), device=device)  # to pixels
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
         with dt[2]:
-            preds = non_max_suppression(preds,
-                                        conf_thres,
-                                        iou_thres if (not hyp or 'nms_iou_t' not in hyp) else hyp['nms_iou_t'],
-                                        labels=lb,
-                                        multi_label=True,
-                                        agnostic=single_cls if (not hyp or 'nms_agnostic' not in hyp) else hyp['nms_agnostic'],
-                                        max_det=max_det)
+            preds = non_max_suppression(
+                preds,
+                conf_thres,
+                iou_thres if (not hyp or "nms_iou_t" not in hyp) else hyp["nms_iou_t"],
+                labels=lb,
+                multi_label=True,
+                agnostic=single_cls if (not hyp or "nms_agnostic" not in hyp) else hyp["nms_agnostic"],
+                max_det=max_det,
+            )
 
         # Metrics
         for si, pred in enumerate(preds):
@@ -301,17 +303,17 @@ def run(
                 save_one_txt(predn, save_conf, shape, file=save_dir / "labels" / f"{path.stem}.txt")
             if save_json:
                 save_one_json(predn, jdict, path, class_map)  # append to COCO-JSON dictionary
-        
+
         if batch_i in np.linspace(0, len(dataloader) - 1, 16).astype(int):
             # Plot images with bounding boxes, 16 by default, 1 per batch
             # evenly spaced accorss the dataset batch size
-            callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
+            callbacks.run("on_val_image_end", pred, predn, path, names, im[si])
 
         # Plot images
         # if plots and batch_i < 3:
         if plots and batch_i in np.linspace(0, len(dataloader) - 2, 3).astype(int):
-            plot_images(im, targets, paths, save_dir / f'val_batch{batch_i}_labels.jpg', names)  # labels
-            plot_images(im, output_to_target(preds), paths, save_dir / f'val_batch{batch_i}_pred.jpg', names)  # pred
+            plot_images(im, targets, paths, save_dir / f"val_batch{batch_i}_labels.jpg", names)  # labels
+            plot_images(im, output_to_target(preds), paths, save_dir / f"val_batch{batch_i}_pred.jpg", names)  # pred
 
         callbacks.run("on_val_batch_end", batch_i, im, targets, paths, shapes, preds)
 

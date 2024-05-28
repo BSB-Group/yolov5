@@ -8,37 +8,34 @@ TODO: add metadata to model file:
     - classes_names
 """
 
-import os
 import logging
-from typing import Union, Sequence, List, Dict
+import os
 from pathlib import Path
-import yaml
+from typing import Dict, List, Sequence, Union
+
 import numpy as np
+import yaml
 from sklearn.preprocessing import LabelEncoder
 
-# import pycuda.autoinit  # cuda context initialized manually in __init__
-
-from .preprocessing import preprocess_yolo, resize_and_center_images_in_batch
-from .postprocessing import postprocess_ahoy
-from .misc import Profile
 from .ahoy import AHOYv5
+from .misc import Profile
+from .postprocessing import postprocess_ahoy
+
+# import pycuda.autoinit  # cuda context initialized manually in __init__
+from .preprocessing import preprocess_yolo, resize_and_center_images_in_batch
 
 logger = logging.getLogger(__name__)
 
 
 def load_labels(label_path):
-    """
-    Load label mapping from file.
-    """
+    """Load label mapping from file."""
     with open(label_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 class DANv5:
     """
-    Day
-    And
-    Night detection model
+    Day And Night detection model.
 
     Based on two AHOYv5 models.
     """
@@ -79,9 +76,7 @@ class DANv5:
         self.cls_maps = load_labels(cls_maps_fpath)
         if isinstance(self.cls_maps, list):
             self.label_encoder = LabelEncoder()
-            self.label_encoder.fit(
-                list({v for cls_map in self.cls_maps for v in cls_map.values()})
-            )
+            self.label_encoder.fit(list({v for cls_map in self.cls_maps for v in cls_map.values()}))
         else:
             # assume both outputs have same mapping
             self.cls_maps = [self.cls_maps] * len(self.model.inputs)
@@ -192,16 +187,12 @@ class DANv5:
         np.ndarray
             Preprocessed image.
         """
-        return [
-            preprocess_yolo(im, input_hw, self.model.fp16)
-            for input_hw, im in zip(self.model.input_hw, ims)
-        ]
+        return [preprocess_yolo(im, input_hw, self.model.fp16) for input_hw, im in zip(self.model.input_hw, ims)]
 
     def preprocess_fast(self, ims: Sequence[np.array]) -> Sequence[np.ndarray]:
         """
-        Transform the input image so that the model can infer from it.
-        This runs under the assumption that input images have a constant size
-        throughout the pipeline.
+        Transform the input image so that the model can infer from it. This runs under the assumption that input images
+        have a constant size throughout the pipeline.
 
         Parameters
         ----------
@@ -214,8 +205,7 @@ class DANv5:
             Preprocessed image.
         """
         return [
-            resize_and_center_images_in_batch(im, alloc_array)
-            for im, alloc_array in zip(ims, self.model.alloc_arrays)
+            resize_and_center_images_in_batch(im, alloc_array) for im, alloc_array in zip(ims, self.model.alloc_arrays)
         ]
 
     def postprocess(
@@ -284,7 +274,7 @@ class DANv5:
         ]
 
     def predict(self, img, conf_thresh, iou_thresh, do_curve_fit=True):
-        """shortcut for detect() with output_mode="qa" """
+        """Shortcut for detect() with output_mode="qa"."""
         return self.detect(
             img,
             output_mode="qa",
@@ -340,9 +330,7 @@ class DANv5:
         outputs_dets = self(ims, conf_thresh, iou_thresh, do_curve_fit)
         outputs_dets = [
             AHOYv5.to_mode(dets, output_mode, orig_shape, cls_map)
-            for dets, orig_shape, cls_map in zip(
-                outputs_dets, orig_shapes, self.cls_maps
-            )
+            for dets, orig_shape, cls_map in zip(outputs_dets, orig_shapes, self.cls_maps)
         ]
 
         if output_mode == "qa" and self.label_encoder is not None:

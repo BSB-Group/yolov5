@@ -200,7 +200,9 @@ def create_dataloader(
     nd = torch.cuda.device_count()  # number of CUDA devices
     nw = min([os.cpu_count() // max(nd, 1), batch_size if batch_size > 1 else 0, workers])  # number of workers
     sampler = None if rank == -1 else SmartDistributedSampler(dataset, shuffle=shuffle)
-    loader = DataLoader if image_weights or close_mosaic else InfiniteDataLoader  # only DataLoader allows for attribute updates
+    loader = (
+        DataLoader if image_weights or close_mosaic else InfiniteDataLoader
+    )  # only DataLoader allows for attribute updates
     generator = torch.Generator()
     generator.manual_seed(6148914691236517205 + seed + RANK)
     return loader(
@@ -857,7 +859,7 @@ class LoadImagesAndLabels(Dataset):
             else:  # read image
                 # im = cv2.imread(f)  # BGR
                 im = imread_16bit_compatible(f, augment16=self.augment)  # BGR
-                assert im is not None, f'Image Not Found {f}'
+                assert im is not None, f"Image Not Found {f}"
             h0, w0 = im.shape[:2]  # orig hw
             r = self.img_size / max(h0, w0)  # ratio
             if r != 1:  # if sizes are not equal
@@ -1056,13 +1058,14 @@ def imread_16bit_compatible(f, augment16=False):
     im = cv2.imread(f, cv2.IMREAD_UNCHANGED)
     if im.dtype == np.uint8:
         if im.ndim == 2 or im.shape[2] == 1:
-            im = cv2.cvtColor(im, cv2.COLOR_GRAY2RGB) # RGB
+            im = cv2.cvtColor(im, cv2.COLOR_GRAY2RGB)  # RGB
         else:
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB) # RGB
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # RGB
     if im.dtype == np.uint16:
         try:
             from utils.albumentations16 import convert_16bit_to_8bit
-            im = convert_16bit_to_8bit(im, augment=augment16) # RGB
+
+            im = convert_16bit_to_8bit(im, augment=augment16)  # RGB
         except Exception as e:
             print(f"WARNING: Failed to convert image {f} from 16-bit to 8-bit")
             raise e

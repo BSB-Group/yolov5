@@ -5,18 +5,16 @@ import numpy as np
 import torch
 from torch import nn
 
+from models.common import Classify, DetectMultiBackend
+from models.experimental import attempt_load
+from models.yolo import BaseModel, DetectionModel
 from utils.general import LOGGER
 from utils.plots import feature_visualization
 from utils.torch_utils import select_device
-from models.experimental import attempt_load
-from models.yolo import BaseModel, DetectionModel
-from models.common import Classify, DetectMultiBackend
 
 
 class HorizonModel(BaseModel):
-    """
-    YOLOv5 backbone + classification heads for pitch and theta.
-    """
+    """YOLOv5 backbone + classification heads for pitch and theta."""
 
     def __init__(
         self,
@@ -73,9 +71,7 @@ class HorizonModel(BaseModel):
         if isinstance(model, DetectMultiBackend):
             model = model.model  # unwrap DetectMultiBackend
 
-        c_pitch, c_theta = _get_classification_heads(
-            model, cutoff, self.nc_pitch, self.nc_theta
-        )
+        c_pitch, c_theta = _get_classification_heads(model, cutoff, self.nc_pitch, self.nc_theta)
         model.save = set(list(model.save + [cutoff]))  # add cutoff to save
 
         # remove layers after cutoff
@@ -90,11 +86,7 @@ class HorizonModel(BaseModel):
         y, dt = [], []  # outputs
         for m in self.model:
             if m.f != -1:  # if not from previous layer
-                x = (
-                    y[m.f]
-                    if isinstance(m.f, int)
-                    else [x if j == -1 else y[j] for j in m.f]
-                )  # from earlier layers
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.type == "models.common.Classify" and "pitch" in m.i:
@@ -110,7 +102,8 @@ class HorizonModel(BaseModel):
         return (x_pitch, x_theta)
 
     def to_discrete(self, pitch: torch.Tensor, theta: torch.Tensor):
-        """Take values from [0, 1] and convert to discrete values.
+        """
+        Take values from [0, 1] and convert to discrete values.
 
         Values are rounded and clamped to [0, nc_pitch - 1] and [0, nc_theta - 1].
         """
@@ -119,7 +112,8 @@ class HorizonModel(BaseModel):
         return pitch_i, theta_i
 
     def to_continuous(self, pitch_i: torch.Tensor, theta_i: torch.Tensor):
-        """Take discrete values and convert to continuous values.
+        """
+        Take discrete values and convert to continuous values.
 
         NOTE: Exact values cannot be guaranteed because of rounding.
         """
@@ -129,7 +123,8 @@ class HorizonModel(BaseModel):
 
     @staticmethod
     def postprocess(x_pitch: torch.Tensor, x_theta: torch.Tensor):
-        """Postprocess classification heads.
+        """
+        Postprocess classification heads.
 
         Args:
             x_pitch (torch.Tensor): pitch classification head
@@ -150,7 +145,8 @@ class HorizonModel(BaseModel):
 
     @staticmethod
     def decode_pitch(offset: float, offset_buffer: float = 0.15):
-        """Decode offset logits to their original values.
+        """
+        Decode offset logits to their original values.
 
         Parameters
         ----------
@@ -169,7 +165,8 @@ class HorizonModel(BaseModel):
 
     @staticmethod
     def decode_theta(theta: float):
-        """Decode theta logits to their original values.
+        """
+        Decode theta logits to their original values.
 
         Parameters
         ----------
@@ -183,7 +180,8 @@ class HorizonModel(BaseModel):
 
     @staticmethod
     def postprocess_curve_fit(x_pitch: torch.Tensor, x_theta: torch.Tensor):
-        """Postprocess classification heads using Gaussian curve fitting.
+        """
+        Postprocess classification heads using Gaussian curve fitting.
 
         NOTE: Experimental!, supports only batch size of 1.
 
@@ -227,9 +225,7 @@ class HorizonModel(BaseModel):
 
 
 class ObjectsModel(BaseModel):
-    """
-    Wrapper around YOLOv5 DetectionModel.
-    """
+    """Wrapper around YOLOv5 DetectionModel."""
 
     def __init__(
         self,
@@ -245,9 +241,7 @@ class ObjectsModel(BaseModel):
         if Path(weights).is_file() or weights.endswith(".pt"):
             model = attempt_load(weights, device="cpu", fuse=fuse)
             stride = model.stride
-            names = (
-                model.module.names if hasattr(model, "module") else model.names
-            )  # get class names
+            names = model.module.names if hasattr(model, "module") else model.names  # get class names
             LOGGER.info(f"Loaded weights from {weights}")
         else:
             raise ValueError("model must be a path to a .pt file")
@@ -261,12 +255,7 @@ class ObjectsModel(BaseModel):
 
 
 class AHOY(nn.Module):
-    """
-    A
-    H-orizon
-    O-bject detection
-    Y-OLOv5
-    """
+    """A H-orizon O-bject detection Y-OLOv5."""
 
     # Ensemble of models
     def __init__(
@@ -279,12 +268,8 @@ class AHOY(nn.Module):
         inplace: bool = True,  # inplace modification of models
     ):
         super().__init__()
-        self.obj_det = ObjectsModel(
-            obj_det_weigths, device=device, fp16=fp16, fuse=fuse
-        )
-        self.hor_det = HorizonModel(
-            hor_det_weights, device=device, fp16=fp16, fuse=fuse
-        )
+        self.obj_det = ObjectsModel(obj_det_weigths, device=device, fp16=fp16, fuse=fuse)
+        self.hor_det = HorizonModel(hor_det_weights, device=device, fp16=fp16, fuse=fuse)
         self.device = select_device(device)
         self.fp16 = fp16
         self.stride = self.obj_det.stride
@@ -294,45 +279,30 @@ class AHOY(nn.Module):
         self.hooks = {}
 
     def forward(self, x, profile=False, visualize=False):
-        """
-        Forward pass through models.
-        """
+        """Forward pass through models."""
         objects = self.obj_det(x, profile, visualize)
         pitch, theta = self.hor_det(x, profile, visualize)
         return objects, pitch, theta
 
     def register_preprocessing_hook(self):
-        """
-        Register hooks to convert uint8 to fp16/fp32 and scale by 1/255 before
-        forward pass.
-        """
+        """Register hooks to convert uint8 to fp16/fp32 and scale by 1/255 before forward pass."""
         if "preprocessing" in self.hooks:
             return
-        self.hooks["preprocessing"] = self.register_forward_pre_hook(
-            self._preprocessing_hook
-        )
+        self.hooks["preprocessing"] = self.register_forward_pre_hook(self._preprocessing_hook)
 
     def register_postprocessing_hook(self):
-        """
-        Register hooks to convert half to float precision after forward pass.
-        """
+        """Register hooks to convert half to float precision after forward pass."""
         if "postprocessing" in self.hooks:
             return
-        self.hooks["postprocessing"] = self.register_forward_hook(
-            self._postprocessing_hook
-        )
+        self.hooks["postprocessing"] = self.register_forward_hook(self._postprocessing_hook)
 
     def register_io_hooks(self):
-        """
-        Register hooks for input and output processing.
-        """
+        """Register hooks for input and output processing."""
         self.register_preprocessing_hook()
         self.register_postprocessing_hook()
 
     def remove_hooks(self):
-        """
-        Remove hooks.
-        """
+        """Remove hooks."""
         for _, hook in self.hooks.items():
             hook.remove()
         self.hooks.clear()
@@ -406,17 +376,13 @@ class DAN(nn.Module):
         self.model_b = model_b
 
     def forward(self, x_1, x_2, profile=False, visualize=False):
-        """
-        Forward pass through models.
-        """
+        """Forward pass through models."""
         out_a = self.model_a(x_1, profile, visualize)
         out_b = self.model_b(x_2, profile, visualize)
         return out_a, out_b
 
     def register_io_hooks(self):
-        """
-        Register hooks for input and output processing.
-        """
+        """Register hooks for input and output processing."""
         self.model_a.register_io_hooks()
         self.model_b.register_io_hooks()
 
@@ -494,9 +460,7 @@ class Hydra(BaseModel):
         if isinstance(model, DetectMultiBackend):
             model = model.model  # unwrap DetectMultiBackend
 
-        c_pitch, c_theta = _get_classification_heads(
-            model, cutoff, self.nc_pitch, self.nc_theta
-        )
+        c_pitch, c_theta = _get_classification_heads(model, cutoff, self.nc_pitch, self.nc_theta)
         model.save = set(list(model.save + [cutoff]))  # add cutoff to save
 
         # add classification heads to model
@@ -510,11 +474,7 @@ class Hydra(BaseModel):
             if isinstance(m.i, int) and m.i > self.cutoff:
                 continue
             if m.f != -1:  # if not from previous layer
-                x = (
-                    y[m.f]
-                    if isinstance(m.f, int)
-                    else [x if j == -1 else y[j] for j in m.f]
-                )  # from earlier layers
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.type == "models.common.Classify" and "pitch" in m.i:
@@ -537,11 +497,7 @@ class Hydra(BaseModel):
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.f != -1:  # if not from previous layer
-                x = (
-                    y[m.f]
-                    if isinstance(m.f, int)
-                    else [x if j == -1 else y[j] for j in m.f]
-                )  # from earlier layers
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
             if visualize:
@@ -553,11 +509,7 @@ class Hydra(BaseModel):
         y, dt = [], []  # outputs
         for m in self.model:
             if m.f != -1:  # if not from previous layer
-                x = (
-                    y[m.f]
-                    if isinstance(m.f, int)
-                    else [x if j == -1 else y[j] for j in m.f]
-                )  # from earlier layers
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.type == "models.common.Classify" and "pitch" in m.i:
@@ -582,9 +534,7 @@ class Hydra(BaseModel):
 
 
 def _find_cutoff(model):
-    """
-    Find cutoff layer for classification heads.
-    """
+    """Find cutoff layer for classification heads."""
     for i, m in enumerate(model.model):
         if m.type == "models.common.SPPF":
             return i - 1
@@ -593,15 +543,15 @@ def _find_cutoff(model):
 
 def _get_classification_heads(model, cutoff, nc_pitch, nc_theta):
     """
-    Get classification heads. Similar to method found in
+    Get classification heads.
+
+    Similar to method found in
     `models.yolo.ClassificationModel._from_detection_model`
     """
 
     # get number of input channels for classification heads
     m = model.model[cutoff + 1]  # layer after cutoff
-    ch = (
-        m.conv.in_channels if hasattr(m, "conv") else m.cv1.conv.in_channels
-    )  # ch into module
+    ch = m.conv.in_channels if hasattr(m, "conv") else m.cv1.conv.in_channels  # ch into module
 
     # define classification heads
     c_pitch = Classify(ch, nc_pitch)

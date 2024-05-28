@@ -16,7 +16,8 @@ from utils.metrics import bbox_ioa
 IMAGENET_MEAN = 0.485, 0.456, 0.406  # RGB mean
 IMAGENET_STD = 0.229, 0.224, 0.225  # RGB standard deviation
 BACKGROUND_COLOR = (0, 0, 0)  # border color for padding
-FILL_VALUE = 0 # 114
+FILL_VALUE = 0  # 114
+
 
 class Albumentations:
     # YOLOv5 Albumentations class (optional, only used if package is installed)
@@ -398,7 +399,7 @@ class LetterBox:
         hs, ws = (math.ceil(x / self.stride) * self.stride for x in (h, w)) if self.auto else self.h, self.w
         top, left = round((hs - h) / 2 - 0.1), round((ws - w) / 2 - 0.1)
         im_out = np.full((self.h, self.w, 3), FILL_VALUE, dtype=im.dtype)
-        im_out[top:top + h, left:left + w] = cv2.resize(im, (w, h), interpolation=cv2.INTER_LINEAR)
+        im_out[top : top + h, left : left + w] = cv2.resize(im, (w, h), interpolation=cv2.INTER_LINEAR)
         return im_out
 
 

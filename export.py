@@ -170,6 +170,7 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
     """Exports a YOLOv5 model to ONNX format with dynamic axes and optional simplification."""
     check_requirements("onnx>=1.12.0")
     import onnx
+
     from models.custom import AHOY, DAN
 
     LOGGER.info(f"\n{prefix} starting export with onnx {onnx.__version__}...")
@@ -183,10 +184,7 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
         output_names = ["output0", "output1", "output2"]
     elif isinstance(model, DAN):
         input_names = ["images_a", "images_b"]
-        output_names = [
-            "output_a0","output_a1","output_a2",
-            "output_b0","output_b1","output_b2"
-        ]
+        output_names = ["output_a0", "output_a1", "output_a2", "output_b0", "output_b1", "output_b2"]
     else:
         input_names = ["images"]
         output_names = ["output0"]
@@ -196,7 +194,7 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
             dynamic["output0"] = {0: "batch", 1: "anchors"}  # shape(1,25200,85)
             dynamic["output1"] = {0: "batch", 2: "mask_height", 3: "mask_width"}  # shape(1,32,160,160)
         elif isinstance(model, DetectionModel):
-            dynamic['output0'] = {0: 'batch', 1: 'anchors'}  # shape(1,25200,85)
+            dynamic["output0"] = {0: "batch", 1: "anchors"}  # shape(1,25200,85)
         elif isinstance(model, (AHOY, DAN)):
             raise NotImplementedError(f"Dynamic export not supported for {model.__class__.__name__}")
 
@@ -224,7 +222,7 @@ def export_onnx(model, im, file, opset, dynamic, simplify, prefix=colorstr("ONNX
     if isinstance(model, DAN):
         d = {
             "stride": [int(max(model.model_a.stride)), int(max(model.model_b.stride))],
-            "names": [model.model_a.names, model.model_b.names]
+            "names": [model.model_a.names, model.model_b.names],
         }
     else:
         d = {"stride": int(max(model.stride)), "names": model.names}
@@ -348,25 +346,28 @@ def export_coreml(model, im, file, int8, half, nms, prefix=colorstr("CoreML:")):
 
 
 @try_export
-def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr("TensorRT:")):    
+def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr("TensorRT:")):
     """
     Exports a YOLOv5 model to TensorRT engine format, requiring GPU and TensorRT>=7.0.0.
 
     https://developer.nvidia.com/tensorrt
     """
     if isinstance(im, (list, tuple)):
-        assert all(i.device.type != "cpu" for i in im), "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
+        assert all(
+            i.device.type != "cpu" for i in im
+        ), "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
     else:
         assert im.device.type != "cpu", "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
     try:
         import tensorrt as trt
+
         from models.custom import AHOY, DAN
     except Exception:
         if platform.system() == "Linux":
             check_requirements("nvidia-tensorrt", cmds="-U --index-url https://pypi.ngc.nvidia.com")
         import tensorrt as trt
 
-    if trt.__version__[0] == '7':  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
+    if trt.__version__[0] == "7":  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
         if isinstance(model, AHOY):
             grid = model.obj_det.model[-1].anchor_grid
             model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]

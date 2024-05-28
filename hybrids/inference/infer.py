@@ -1,16 +1,13 @@
-"""
-Abstract class for inference.
-"""
+"""Abstract class for inference."""
 
-from typing import Union, List
 from abc import ABC, abstractmethod
+from typing import List, Union
+
 import numpy as np
 
 
 class Infer(ABC):
-    """
-    Abstract class for inference.
-    """
+    """Abstract class for inference."""
 
     @abstractmethod
     def load_model(self, model_path: str):
@@ -67,8 +64,7 @@ class Infer(ABC):
         if self._alloc_arrays is None:
             if isinstance(self.input_shape, list):
                 self._alloc_arrays = [
-                    np.zeros(shape, dtype=dtype)
-                    for dtype, shape in zip(self.dtype, self.input_shape)
+                    np.zeros(shape, dtype=dtype) for dtype, shape in zip(self.dtype, self.input_shape)
                 ]
             else:
                 self._alloc_arrays = np.zeros(self.input_shape, dtype=self.dtype)

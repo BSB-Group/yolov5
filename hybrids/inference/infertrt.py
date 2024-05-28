@@ -1,23 +1,21 @@
-"""
-Inference using TensorRT engine.
-"""
+"""Inference using TensorRT engine."""
 
 import logging
-from typing import Union, List
+from typing import List, Union
+
 import numpy as np
-import tensorrt as trt
 import pycuda.driver as cuda
+import tensorrt as trt
+
+from .engine import allocate_buffers, do_inference, load_engine
 from .infer import Infer
-from .engine import load_engine, allocate_buffers, do_inference
 
 # loggers
 TRT_LOGGER = trt.Logger(trt.Logger.ERROR)
 
 
 class InferTRT(Infer):
-    """
-    Inference using TensorRT engine.
-    """
+    """Inference using TensorRT engine."""
 
     def __init__(self, trt_engine_path: str, device: int = 0) -> None:
         """
@@ -42,9 +40,7 @@ class InferTRT(Infer):
         self.context = self.trt_engine.create_execution_context()
 
         # This allocates memory for network inputs/outputs on both CPU and GPU
-        self.inputs, self.outputs, self.bindings, self.stream = allocate_buffers(
-            self.trt_engine
-        )
+        self.inputs, self.outputs, self.bindings, self.stream = allocate_buffers(self.trt_engine)
 
         print("⚙️ TensorRT engine loaded successfully.")
         for i in self.inputs:
@@ -119,9 +115,7 @@ class InferTRT(Infer):
             msg = f"input shape {inp.shape} not equal to image shape {im.shape}"
             assert inp.shape == im.shape, msg
 
-    def forward(
-        self, ims: Union[np.ndarray, List[np.ndarray]]
-    ) -> Union[np.ndarray, List[np.ndarray]]:
+    def forward(self, ims: Union[np.ndarray, List[np.ndarray]]) -> Union[np.ndarray, List[np.ndarray]]:
         """
         Run inference on batch of images.
 
@@ -149,7 +143,7 @@ class InferTRT(Infer):
         for inp, im in zip(self.inputs, [ims] if len(self.inputs) == 1 else ims):
             np.copyto(inp.host, np.ascontiguousarray(im.ravel()))
 
-        # When infering on single image, we measure inference
+        # When inferring on single image, we measure inference
         # time to output it to the user
         # inference_start_time = time.time()
 
@@ -163,9 +157,7 @@ class InferTRT(Infer):
         )
 
         # Reshape outputs
-        detection_outs = [
-            np.reshape(det, out.shape) for det, out in zip(detection_outs, self.outputs)
-        ]
+        detection_outs = [np.reshape(det, out.shape) for det, out in zip(detection_outs, self.outputs)]
 
         # Output inference time
         # print("TensorRT inference time: {} ms".format(

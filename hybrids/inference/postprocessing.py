@@ -1,17 +1,19 @@
 """
 Collection of postprocessing functions for object detection models.
+
 Most functions are designed to work with NumPy arrays.
 """
 
-from typing import Tuple, Sequence
+from typing import Sequence, Tuple
+
 import numpy as np
 from scipy.optimize import curve_fit
 
 
 def cxcywh_to_xyxy(bboxes: np.ndarray) -> np.ndarray:
     """
-    Convert bounding boxes from (center_x, center_y, width, height) to
-    (top_left_x, top_left_y, bottom_right_x, bottom_right_y) format.
+    Convert bounding boxes from (center_x, center_y, width, height) to (top_left_x, top_left_y, bottom_right_x,
+    bottom_right_y) format.
 
     Parameters
     ----------
@@ -34,8 +36,8 @@ def cxcywh_to_xyxy(bboxes: np.ndarray) -> np.ndarray:
 
 def xyxy_to_xywh(bboxes: np.ndarray) -> np.ndarray:
     """
-    Convert bounding boxes from (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
-    to (center_x, center_y, width, height).
+    Convert bounding boxes from (top_left_x, top_left_y, bottom_right_x, bottom_right_y) to (center_x, center_y, width,
+    height).
 
     Parameters
     ----------
@@ -55,8 +57,8 @@ def xyxy_to_xywh(bboxes: np.ndarray) -> np.ndarray:
 
 def xyxy_to_xyxyn(bboxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     """
-    Convert bounding boxes in form of (x, y, x, y) from absolute pixels to relative
-    pixels in range [0, 1] with respect to certain shape.
+    Convert bounding boxes in form of (x, y, x, y) from absolute pixels to relative pixels in range [0, 1] with respect
+    to certain shape.
 
     Parameters
     ----------
@@ -78,8 +80,8 @@ def xyxy_to_xyxyn(bboxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
 
 def xyxyn_to_xyxy(bboxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     """
-    Convert bounding boxes in form of (x, y, x, y) from relative pixels in range [0, 1]
-    to absolute pixels with respect to certain shape.
+    Convert bounding boxes in form of (x, y, x, y) from relative pixels in range [0, 1] to absolute pixels with respect
+    to certain shape.
 
     Parameters
     ----------
@@ -106,7 +108,7 @@ def scale_boxes(
     only_downscale: bool = False,
 ) -> np.ndarray:
     """
-    Rescale bounding boxes from from_shape to to_shape
+    Rescale bounding boxes from from_shape to to_shape.
 
     Parameters
     ----------
@@ -149,7 +151,7 @@ def clip_boxes(boxes, shape):
 
 def intersection_box(target_box: np.ndarray, boxes: np.ndarray) -> list:
     """
-    Calculate intersection of target boxes with all others in boxes
+    Calculate intersection of target boxes with all others in boxes.
 
     Parameters
     ----------
@@ -193,7 +195,7 @@ def iou(
     areas: np.ndarray,
 ) -> np.ndarray:
     """
-    Calculate intersection over union of target box with all others
+    Calculate intersection over union of target box with all others.
 
     Parameters
     ----------
@@ -360,9 +362,7 @@ def offset_theta_to_points(
     return (x1, y1), (x2, y2)
 
 
-def offset_theta_to_slope_intercept(
-    offset: float, theta: float, offset_buffer: float = 0.15, theta_gain: float = 1.0
-):
+def offset_theta_to_slope_intercept(offset: float, theta: float, offset_buffer: float = 0.15, theta_gain: float = 1.0):
     """
     Convert offset and theta to slope-intercept form of line: m, b.
 
@@ -385,9 +385,7 @@ def offset_theta_to_slope_intercept(
 
 
 def slope_intercept_to_points(m: float, b: float, w: int = 1, h: int = 1):
-    """
-    Convert slope-intercept form of line to two points.
-    """
+    """Convert slope-intercept form of line to two points."""
 
     if m == np.inf:
         x_1, y_1 = b * h, 0
@@ -401,6 +399,7 @@ def slope_intercept_to_points(m: float, b: float, w: int = 1, h: int = 1):
 def gaussian_curve_fit(data: np.ndarray, ftol: float = 1e-4, xtol: float = 1e-4):
     """
     Fit a gaussian to the softmax data to find peak.
+
     Returns the parameters of the gaussian: (A, mu, sigma)
     """
 

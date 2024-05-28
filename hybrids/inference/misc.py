@@ -1,5 +1,6 @@
-import time
 import contextlib
+import time
+
 import numpy as np
 
 
@@ -24,7 +25,8 @@ class Profile(contextlib.ContextDecorator):
 
 
 def yolov8_to_yolov5(model_output):
-    """Convert YOLOv8 output to YOLOv5 format.
+    """
+    Convert YOLOv8 output to YOLOv5 format.
 
     Parameters
     ----------

@@ -1,22 +1,21 @@
-"""
-Custom augmentations following the Albumentations API.
-"""
+"""Custom augmentations following the Albumentations API."""
 
-from typing import Dict, Tuple, Union, Sequence
 import random
+from typing import Dict, Sequence, Tuple, Union
 
-import numpy as np
 import cv2
+import numpy as np
+from albumentations.augmentations.geometric import functional as F
 from albumentations.core.transforms_interface import (
     BoxInternalType,
     DualTransform,
     KeypointInternalType,
 )
-from albumentations.augmentations.geometric import functional as F
 
 
 class ResizeIfNeeded(DualTransform):
-    """Resize an image if its longest side is greater than a specified value.
+    """
+    Resize an image if its longest side is greater than a specified value.
 
     Args:
         max_size (int, list of int): maximum size of the image after the transformation. When using a list, max size
@@ -57,9 +56,7 @@ class ResizeIfNeeded(DualTransform):
         # Bounding box coordinates are scale invariant
         return bbox
 
-    def apply_to_keypoint(
-        self, keypoint: KeypointInternalType, max_size: int = 1024, **params
-    ) -> KeypointInternalType:
+    def apply_to_keypoint(self, keypoint: KeypointInternalType, max_size: int = 1024, **params) -> KeypointInternalType:
         height = params["rows"]
         width = params["cols"]
 
@@ -68,13 +65,7 @@ class ResizeIfNeeded(DualTransform):
         return F.keypoint_scale(keypoint, scale, scale)
 
     def get_params(self) -> Dict[str, int]:
-        return {
-            "max_size": (
-                self.max_size
-                if isinstance(self.max_size, int)
-                else random.choice(self.max_size)
-            )
-        }
+        return {"max_size": (self.max_size if isinstance(self.max_size, int) else random.choice(self.max_size))}
 
     def get_transform_init_args_names(self) -> Tuple[str, ...]:
         return ("max_size", "interpolation")

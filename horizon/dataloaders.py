@@ -2,17 +2,18 @@
 SEA.AI
 authors: Kevin Serrano,
 
-This file contains the dataset classes used for training 
+This file contains the dataset classes used for training
 YOLOv5 horizon detection model (RGB and ir16bit).
 """
 
 from typing import List, Tuple
-import numpy as np
-import fiftyone as fo
-import cv2
 
+import cv2
+import fiftyone as fo
+import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
+
 import horizon.transforms as T
 
 
@@ -23,7 +24,7 @@ def get_train_rgb_dataloader(
     num_workers: int = 8,
     shuffle: bool = True,
     pin_memory: bool = False,
-    dataloader_kwargs: dict = None
+    dataloader_kwargs: dict = None,
 ):
     """Get training set dataloader for an RGB dataset."""
     dataset = HorizonDataset(
@@ -120,8 +121,7 @@ def get_val_ir16bit_dataloader(
 
 class FiftyOneBaseDataset(Dataset):
     """
-    Base class for datasets using FiftyOne datasets.
-    Use this as parent class for your custom dataset.
+    Base class for datasets using FiftyOne datasets. Use this as parent class for your custom dataset.
 
     You may want to extend __init__ and __getitem__.
     Example:
@@ -201,11 +201,7 @@ class HorizonDataset(Dataset):
         target = self.targets[idx]
 
         if self.replace_8bit_path:
-            fpath = (
-                fpath.replace("8Bit", "16Bit")
-                .replace(".jpg", ".png")
-                .replace("jpeg", "png")
-            )
+            fpath = fpath.replace("8Bit", "16Bit").replace(".jpg", ".png").replace("jpeg", "png")
 
         # read image (np.ndarray)
         image = cv2.imread(fpath, cv2.IMREAD_UNCHANGED)

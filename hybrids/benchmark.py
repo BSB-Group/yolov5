@@ -7,26 +7,21 @@ Example usage:
 """
 
 import argparse
+from typing import Sequence, Tuple
 from urllib.request import urlopen
-from typing import Tuple, Sequence
+
 import numpy as np
-from PIL import Image
-from inference.dan import DANv5
 from inference.ahoy import AHOYv5
+from inference.dan import DANv5
+from PIL import Image
 
 
 def get_dan_model_and_input(engine_path: str) -> Tuple[DANv5, Sequence[np.ndarray]]:
-    """
-    Get the DAN model and input images for testing.
-    """
+    """Get the DAN model and input images for testing."""
     dan = DANv5(model_path=engine_path)
 
-    url_rgb = (
-        "https://github.com/SEA-AI/.github/blob/main/assets/example_1_RGB.jpg?raw=true"
-    )
-    url_ir = (
-        "https://github.com/SEA-AI/.github/blob/main/assets/example_1_IR.jpg?raw=true"
-    )
+    url_rgb = "https://github.com/SEA-AI/.github/blob/main/assets/example_1_RGB.jpg?raw=true"
+    url_ir = "https://github.com/SEA-AI/.github/blob/main/assets/example_1_IR.jpg?raw=true"
 
     image_rgb = np.array(Image.open(urlopen(url_rgb)).convert("RGB"))
     image_ir = np.array(Image.open(urlopen(url_ir)).convert("RGB"))
@@ -39,9 +34,7 @@ def get_dan_model_and_input(engine_path: str) -> Tuple[DANv5, Sequence[np.ndarra
 
 
 def get_ahoy_model_and_input(engine_path: str) -> Tuple[AHOYv5, np.ndarray]:
-    """
-    Get the AHOY model and input image for testing.
-    """
+    """Get the AHOY model and input image for testing."""
     ahoy = AHOYv5(model_path=engine_path)
     if 640 in ahoy.model.input_hw:
         url = "https://github.com/SEA-AI/.github/blob/main/assets/example_1_IR.jpg?raw=true"
@@ -54,9 +47,7 @@ def get_ahoy_model_and_input(engine_path: str) -> Tuple[AHOYv5, np.ndarray]:
 
 
 def main(engine_path: str, n: int = 100, dry_run: bool = False):
-    """
-    Basic benchmarking of the AHOY and DAN models.
-    """
+    """Basic benchmarking of the AHOY and DAN models."""
 
     if "dan" in engine_path:
         model, images = get_dan_model_and_input(engine_path)
@@ -86,9 +77,7 @@ def _parse_args():
         required=True,
         help="Path to the TensorRT engine file",
     )
-    parser.add_argument(
-        "-n", type=int, default=100, help="Number of iterations to benchmark"
-    )
+    parser.add_argument("-n", type=int, default=100, help="Number of iterations to benchmark")
     parser.add_argument("--dry-run", action="store_true", help="Dry run")
     return parser.parse_args()
 

@@ -1,12 +1,14 @@
 """
 Collection of image preprocessing functions for inference.
+
 Most functions are designed to work with NumPy arrays.
 """
 
-from typing import Tuple
 import math
-import numpy as np
+from typing import Tuple
+
 import cv2
+import numpy as np
 
 
 def resize(im: np.ndarray, max_side: int, fast: bool = True) -> tuple:
@@ -30,9 +32,7 @@ def resize(im: np.ndarray, max_side: int, fast: bool = True) -> tuple:
     r = max_side / max(h0, w0)  # ratio
     if r != 1:  # if sizes are not equal
         interp = cv2.INTER_LINEAR if (fast or r > 1) else cv2.INTER_AREA
-        im = cv2.resize(
-            im, (math.ceil(w0 * r), math.ceil(h0 * r)), interpolation=interp
-        )
+        im = cv2.resize(im, (math.ceil(w0 * r), math.ceil(h0 * r)), interpolation=interp)
     return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
 
 
@@ -87,9 +87,7 @@ def downscale_image_keeping_aspect_ratio(
     """
     if image.shape[0] <= desired_size[1] and image.shape[1] <= desired_size[0]:
         return image
-    return resize_image_keeping_aspect_ratio(
-        image=image, desired_size=desired_size, interpolation=interpolation
-    )
+    return resize_image_keeping_aspect_ratio(image=image, desired_size=desired_size, interpolation=interpolation)
 
 
 def resize_image_keeping_aspect_ratio(
@@ -155,9 +153,7 @@ def center_crop(image: np.ndarray, crop_hw: Tuple[int, int]) -> np.ndarray:
     return image[start_y : start_y + crop_h, start_x : start_x + crop_w]
 
 
-def preprocess_yolo(
-    ims: np.array, input_hw: Tuple[int, int], fp16: bool = False
-) -> np.ndarray:
+def preprocess_yolo(ims: np.array, input_hw: Tuple[int, int], fp16: bool = False) -> np.ndarray:
     """
     Transform the input image so that the engine can infer from it.
 
@@ -186,9 +182,7 @@ def preprocess_yolo(
     return x
 
 
-def resize_and_center_images_in_batch(
-    input_batch: np.ndarray, output_batch: np.ndarray, to_dtype: bool = False
-):
+def resize_and_center_images_in_batch(input_batch: np.ndarray, output_batch: np.ndarray, to_dtype: bool = False):
     """
     Resize and center images from an input batch into a preallocated output batch array.
 
