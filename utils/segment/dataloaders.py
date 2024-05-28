@@ -32,6 +32,7 @@ def create_dataloader(
     rank=-1,
     workers=8,
     image_weights=False,
+    close_mosaic=False,
     quad=False,
     prefix="",
     shuffle=False,
@@ -65,7 +66,7 @@ def create_dataloader(
     nd = torch.cuda.device_count()  # number of CUDA devices
     nw = min([os.cpu_count() // max(nd, 1), batch_size if batch_size > 1 else 0, workers])  # number of workers
     sampler = None if rank == -1 else SmartDistributedSampler(dataset, shuffle=shuffle)
-    loader = DataLoader if image_weights else InfiniteDataLoader  # only DataLoader allows for attribute updates
+    loader = DataLoader if image_weights or close_mosaic else InfiniteDataLoader  # only DataLoader allows for attribute updates
     generator = torch.Generator()
     generator.manual_seed(6148914691236517205 + seed + RANK)
     return loader(
@@ -123,6 +124,7 @@ class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
         self.overlap = overlap
 
     def __getitem__(self, index):
+        """Returns a transformed item from the dataset at the specified index, handling indexing and image weighting."""
         index = self.indices[index]  # linear, shuffled, or image_weights
 
         hyp = self.hyp
@@ -230,7 +232,7 @@ class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
         return (torch.from_numpy(img), labels_out, self.im_files[index], shapes, masks)
 
     def load_mosaic(self, index):
-        # YOLOv5 4-mosaic loader. Loads 1 image + 3 random images into a 4-image mosaic
+        """Loads 1 image + 3 random images into a 4-image YOLOv5 mosaic, adjusting labels and segments accordingly."""
         labels4, segments4 = [], []
         s = self.img_size
         yc, xc = (int(random.uniform(-x, 2 * s + x)) for x in self.mosaic_border)  # mosaic center x, y
@@ -291,6 +293,7 @@ class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
 
     @staticmethod
     def collate_fn(batch):
+        """Custom collation function for DataLoader, batches images, labels, paths, shapes, and segmentation masks."""
         img, label, path, shapes, masks = zip(*batch)  # transposed
         batched_masks = torch.cat(masks, 0)
         for i, l in enumerate(label):
