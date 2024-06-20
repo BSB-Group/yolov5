@@ -4,7 +4,11 @@ from typing import Sequence, Union
 import albumentations as A
 import cv2
 import numpy as np
-from albumentations.core.transforms_interface import ImageOnlyTransform, to_tuple
+from albumentations.core.transforms_interface import ImageOnlyTransform
+try:
+    from albumentations.core.transforms_interface import to_tuple
+except ImportError:
+    from albumentations.core.utils import to_tuple
 
 
 def convert_16bit_to_8bit(im, augment=True):
