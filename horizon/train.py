@@ -350,8 +350,8 @@ def run(
     nc_pitch: int = 500,  # number of pitch classes
     nc_theta: int = 500,  # number of theta classes
     pitch_weight: float = 1.0,  # pitch loss weight
-    theta_weight: float = 1.0,  # theta loss weight
-    joint_weight: float = 1.0,  # joint loss weight
+    theta_weight: float = 0.2,  # theta loss weight
+    joint_weight: float = 0.01,  # joint loss weight
     imgsz: int = 640,  # model input size (assumes squared input)
     epochs: int = 100,
     dropout: float = 0.25,  # dropout rate for classification heads
@@ -610,7 +610,7 @@ def parse_args():
         "--pitch_weight", type=float, default=1.0, help="pitch loss weight"
     )
     parser.add_argument(
-        "--theta_weight", type=float, default=0.1, help="theta loss weight"
+        "--theta_weight", type=float, default=0.2, help="theta loss weight"
     )
     parser.add_argument(
         "--joint_weight", type=float, default=0.01, help="joint loss weight"
