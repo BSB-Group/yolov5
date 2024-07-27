@@ -146,6 +146,7 @@ def update(
     train_dataloader: DataLoader,
     pitch_weight: float,
     theta_weight: float,
+    joint_weight: float,
     scaler: amp.GradScaler,
     optimizer: torch.optim.Optimizer,
     ema: ModelEMA,
@@ -199,14 +200,14 @@ def update(
         x_pitch, x_theta = model(images)
 
         # classification losses
-        _loss_pitch = loss_pitch(x_pitch, pitch_c)
-        _loss_theta = loss_theta(x_theta, theta_c)
+        _loss_pitch = loss_pitch(x_pitch, pitch_c) * pitch_weight
+        _loss_theta = loss_theta(x_theta, theta_c) * theta_weight
 
         # regression loss
         _loss_pt = loss_pt(
             torch.stack([x_pitch.argmax(dim=-1), x_theta.argmax(dim=-1)], dim=-1),
             torch.stack([pitch_r, theta_r], dim=-1),  # target
-        )
+        ) * joint_weight
 
         # backward
         loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta + _loss_pt
@@ -250,6 +251,7 @@ def evaluate(
     val_dataloader: DataLoader,
     pitch_weight: float,
     theta_weight: float,
+    joint_weight: float,
     ema: ModelEMA,
     focal_alpha: float = 1,
     focal_gamma: float = 2,
@@ -301,15 +303,15 @@ def evaluate(
         )
 
         # classification losses
-        _loss_pitch = loss_pitch(x_pitch, pitch_c)
-        _loss_theta = loss_theta(x_theta, theta_c)
+        _loss_pitch = loss_pitch(x_pitch, pitch_c) * pitch_weight
+        _loss_theta = loss_theta(x_theta, theta_c) * theta_weight
 
         # regression loss
         _loss_pt = loss_pt(
             torch.stack([x_pitch.argmax(dim=-1), x_theta.argmax(dim=-1)], dim=-1),
             torch.stack([pitch_r, theta_r], dim=-1),  # target
-        )
-        loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta + _loss_pt
+        ) * joint_weight
+        loss = _loss_pitch + _loss_theta + _loss_pt
 
         v_loss = (v_loss * i + loss.item()) / (i + 1)  # update mean losses
         v_ploss = (v_ploss * i + _loss_pitch.item()) / (i + 1)
@@ -349,6 +351,7 @@ def run(
     nc_theta: int = 500,  # number of theta classes
     pitch_weight: float = 1.0,  # pitch loss weight
     theta_weight: float = 1.0,  # theta loss weight
+    joint_weight: float = 1.0,  # joint loss weight
     imgsz: int = 640,  # model input size (assumes squared input)
     epochs: int = 100,
     dropout: float = 0.25,  # dropout rate for classification heads
@@ -426,6 +429,7 @@ def run(
             train_dataloader,
             pitch_weight,
             theta_weight,
+            joint_weight,
             scaler,
             optimizer,
             ema,
@@ -437,7 +441,7 @@ def run(
 
         model.eval()
         v_loss, v_ploss, v_tloss, v_ptloss, mse_pitch, mse_theta = evaluate(
-            model, val_dataloader, pitch_weight, theta_weight, ema
+            model, val_dataloader, pitch_weight, theta_weight, joint_weight, ema
         )
 
         if mse_pitch + mse_theta < best_mse:
@@ -606,7 +610,10 @@ def parse_args():
         "--pitch_weight", type=float, default=1.0, help="pitch loss weight"
     )
     parser.add_argument(
-        "--theta_weight", type=float, default=1.0, help="theta loss weight"
+        "--theta_weight", type=float, default=0.1, help="theta loss weight"
+    )
+    parser.add_argument(
+        "--joint_weight", type=float, default=0.01, help="joint loss weight"
     )
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
