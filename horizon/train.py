@@ -242,7 +242,7 @@ def update(
             )
         )
 
-    return t_loss, t_ploss, t_tloss
+    return t_ploss, t_tloss, t_ptloss, t_loss
 
 
 def evaluate(
@@ -421,7 +421,7 @@ def run(
     for epoch in range(epochs):
 
         model.train()
-        t_loss, t_ploss, t_tloss, t_ptloss = update(
+        t_ploss, t_tloss, t_ptloss, t_loss = update(
             model,
             train_dataloader,
             pitch_weight,
