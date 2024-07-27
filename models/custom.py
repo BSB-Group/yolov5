@@ -111,9 +111,9 @@ class HorizonModel(BaseModel):
         """
         Take values from [0, 1] scale to [0, nc_pitch - 1] and [0, nc_theta - 1].
         """
-        pitch_i = (pitch * self.nc_pitch).clamp(0, self.nc_pitch - 1).long()
-        theta_i = (theta * self.nc_theta).clamp(0, self.nc_theta - 1).long()
-        return pitch_i, theta_i
+        pitch_scaled = (pitch * self.nc_pitch).clamp(0, self.nc_pitch - 1).float()
+        theta_scaled = (theta * self.nc_theta).clamp(0, self.nc_theta - 1).float()
+        return pitch_scaled, theta_scaled
 
     def normalise_by_nc(self, pitch_i: torch.Tensor, theta_i: torch.Tensor):
         """
