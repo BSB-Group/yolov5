@@ -159,16 +159,17 @@ def update(
     # Initialize Focal Loss
     loss_pitch = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
     loss_theta = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
+    loss_pt = torch.nn.MSELoss()  # error between [pitch, theta] vectors
 
     # initialize mean losses
-    t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
+    t_ploss, t_tloss, t_ptloss, t_loss = 0.0, 0.0, 0.0, 0.0
 
     s = ("\n" + "%11s" * 7) % (
         "Epoch",
         "GPU_mem",
-        "total_loss",
         "pitch_loss",
         "theta_loss",
+        "joint_loss",
         "Instances",
         "Size",
     )
@@ -185,18 +186,30 @@ def update(
         images, targets = data
         images, targets = images.to(model.device), targets.to(model.device)
 
-        # process targets
-        pitch_i, theta_i = model.to_discrete(
+        # process targets for regression loss
+        pitch_r, theta_r = model.scale_by_nc(
+            pitch=targets[..., 0], theta=targets[..., 1]
+        )
+        # process targets for classification loss
+        pitch_c, theta_c = model.continuous_to_categorical(
             pitch=targets[..., 0], theta=targets[..., 1]
         )
 
         # forward
         x_pitch, x_theta = model(images)
 
+        # classification losses
+        _loss_pitch = loss_pitch(x_pitch, pitch_c)
+        _loss_theta = loss_theta(x_theta, theta_c)
+
+        # regression loss
+        _loss_pt = loss_pt(
+            torch.stack([x_pitch.argmax(dim=-1), x_theta.argmax(dim=-1)], dim=-1),
+            torch.stack([pitch_r, theta_r], dim=-1),  # target
+        )
+
         # backward
-        _loss_pitch = loss_pitch(x_pitch, pitch_i)
-        _loss_theta = loss_theta(x_theta, theta_i)
-        loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta
+        loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta + _loss_pt
         scaler.scale(loss).backward()
 
         # Optimize
@@ -213,6 +226,7 @@ def update(
         t_loss = (t_loss * i + loss.item()) / (i + 1)  # update mean losses
         t_ploss = (t_ploss * i + _loss_pitch.item()) / (i + 1)
         t_tloss = (t_tloss * i + _loss_theta.item()) / (i + 1)
+        t_ptloss = (t_ptloss * i + _loss_pt.item()) / (i + 1)
 
         mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
         pbar.set_description(
@@ -220,9 +234,9 @@ def update(
             % (
                 f"{epoch}/{epochs - 1}",
                 mem,
-                t_loss,
                 t_ploss,
                 t_tloss,
+                t_ptloss,
                 targets.shape[0],
                 images.shape[-1],
             )
@@ -244,6 +258,7 @@ def evaluate(
     # Initialize Focal Loss
     loss_pitch = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
     loss_theta = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
+    loss_pt = torch.nn.MSELoss()  # error between [pitch, theta] vectors
 
     # use MSE as metric
     criterion_pitch = torch.nn.MSELoss()
@@ -251,7 +266,7 @@ def evaluate(
     mse_pitch, mse_theta = 0.0, 0.0
 
     # initialize mean losses
-    v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
+    v_ploss, v_tloss, v_ptloss, v_loss = 0.0, 0.0, 0.0, 0.0
 
     s = ("\n" + "%22s" + "%11s" * 5) % (
         "",
@@ -276,19 +291,30 @@ def evaluate(
         with torch.no_grad():
             x_pitch, x_theta = ema.ema(images)
 
-        # process targets
-        pitch_i, theta_i = model.to_discrete(
+        # process targets for regression loss
+        pitch_r, theta_r = model.scale_by_nc(
+            pitch=targets[..., 0], theta=targets[..., 1]
+        )
+        # process targets for classification loss
+        pitch_c, theta_c = model.continuous_to_categorical(
             pitch=targets[..., 0], theta=targets[..., 1]
         )
 
-        # store losses
-        _loss_pitch = loss_pitch(x_pitch, pitch_i)
-        _loss_theta = loss_theta(x_theta, theta_i)
-        loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta
+        # classification losses
+        _loss_pitch = loss_pitch(x_pitch, pitch_c)
+        _loss_theta = loss_theta(x_theta, theta_c)
+
+        # regression loss
+        _loss_pt = loss_pt(
+            torch.stack([x_pitch.argmax(dim=-1), x_theta.argmax(dim=-1)], dim=-1),
+            torch.stack([pitch_r, theta_r], dim=-1),  # target
+        )
+        loss = pitch_weight * _loss_pitch + theta_weight * _loss_theta + _loss_pt
 
         v_loss = (v_loss * i + loss.item()) / (i + 1)  # update mean losses
         v_ploss = (v_ploss * i + _loss_pitch.item()) / (i + 1)
         v_tloss = (v_tloss * i + _loss_theta.item()) / (i + 1)
+        v_ptloss = (v_ptloss * i + _loss_pt.item()) / (i + 1)
 
         # update running mean of MSE
         (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
@@ -311,7 +337,7 @@ def evaluate(
             )
         )
 
-    return v_loss, v_ploss, v_tloss, mse_pitch, mse_theta
+    return v_loss, v_ploss, v_tloss, v_ptloss, mse_pitch, mse_theta
 
 
 def run(
@@ -393,11 +419,9 @@ def run(
     LOGGER.info("Starting training...\n")
 
     for epoch in range(epochs):
-        t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
-        v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
 
         model.train()
-        t_loss, t_ploss, t_tloss = update(
+        t_loss, t_ploss, t_tloss, t_ptloss = update(
             model,
             train_dataloader,
             pitch_weight,
@@ -412,7 +436,7 @@ def run(
         scheduler.step()
 
         model.eval()
-        v_loss, v_ploss, v_tloss, mse_pitch, mse_theta = evaluate(
+        v_loss, v_ploss, v_tloss, v_ptloss, mse_pitch, mse_theta = evaluate(
             model, val_dataloader, pitch_weight, theta_weight, ema
         )
 
@@ -443,7 +467,7 @@ def run(
             "ema": None,  # deepcopy(ema.ema).half(),
             "updates": ema.updates,
             "optimizer": None,  # optimizer.state_dict(),
-            "losses": dict(pitch=v_ploss, theta=v_tloss, total=v_loss),
+            "losses": dict(pitch=v_ploss, theta=v_tloss, joint=v_ptloss, total=v_loss),
             "date": datetime.now().isoformat(),
         }
         path = ckpt_dir / "last.pt"
@@ -458,9 +482,11 @@ def run(
             "train/total_loss": t_loss,
             "train/pitch_loss": t_ploss,
             "train/theta_loss": t_tloss,
+            "train/joint_loss": t_ptloss,
             "val/total_loss": v_loss,
             "val/pitch_loss": v_ploss,
             "val/theta_loss": v_tloss,
+            "val/joint_loss": v_ptloss,
         }
 
         if epoch % 5 == 0:

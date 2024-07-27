@@ -71,7 +71,9 @@ class HorizonModel(BaseModel):
         if isinstance(model, DetectMultiBackend):
             model = model.model  # unwrap DetectMultiBackend
 
-        c_pitch, c_theta = _get_classification_heads(model, cutoff, self.nc_pitch, self.nc_theta)
+        c_pitch, c_theta = _get_classification_heads(
+            model, cutoff, self.nc_pitch, self.nc_theta
+        )
         model.save = set(list(model.save + [cutoff]))  # add cutoff to save
 
         # remove layers after cutoff
@@ -86,7 +88,11 @@ class HorizonModel(BaseModel):
         y, dt = [], []  # outputs
         for m in self.model:
             if m.f != -1:  # if not from previous layer
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+                x = (
+                    y[m.f]
+                    if isinstance(m.f, int)
+                    else [x if j == -1 else y[j] for j in m.f]
+                )  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.type == "models.common.Classify" and "pitch" in m.i:
@@ -101,25 +107,31 @@ class HorizonModel(BaseModel):
 
         return (x_pitch, x_theta)
 
-    def to_discrete(self, pitch: torch.Tensor, theta: torch.Tensor):
+    def scale_by_nc(self, pitch: torch.Tensor, theta: torch.Tensor):
         """
-        Take values from [0, 1] and convert to discrete values.
+        Take values from [0, 1] scale to [0, nc_pitch - 1] and [0, nc_theta - 1].
+        """
+        pitch_i = (pitch * self.nc_pitch).clamp(0, self.nc_pitch - 1).long()
+        theta_i = (theta * self.nc_theta).clamp(0, self.nc_theta - 1).long()
+        return pitch_i, theta_i
+
+    def normalise_by_nc(self, pitch_i: torch.Tensor, theta_i: torch.Tensor):
+        """
+        Normalise pitch and theta indices by their respective number of classes.
+        """
+        pitch = pitch_i.float() / (self.nc_pitch)
+        theta = theta_i.float() / (self.nc_theta)
+        return pitch, theta
+
+    def continuous_to_categorical(self, pitch: torch.Tensor, theta: torch.Tensor):
+        """
+        Take values from [0, 1] and convert to categorical values for classification.
 
         Values are rounded and clamped to [0, nc_pitch - 1] and [0, nc_theta - 1].
         """
         pitch_i = (pitch * self.nc_pitch).round().clamp(0, self.nc_pitch - 1).long()
         theta_i = (theta * self.nc_theta).round().clamp(0, self.nc_theta - 1).long()
         return pitch_i, theta_i
-
-    def to_continuous(self, pitch_i: torch.Tensor, theta_i: torch.Tensor):
-        """
-        Take discrete values and convert to continuous values.
-
-        NOTE: Exact values cannot be guaranteed because of rounding.
-        """
-        pitch = pitch_i.float() / (self.nc_pitch)
-        theta = theta_i.float() / (self.nc_theta)
-        return pitch, theta
 
     @staticmethod
     def postprocess(x_pitch: torch.Tensor, x_theta: torch.Tensor):
@@ -241,7 +253,9 @@ class ObjectsModel(BaseModel):
         if Path(weights).is_file() or weights.endswith(".pt"):
             model = attempt_load(weights, device="cpu", fuse=fuse)
             stride = model.stride
-            names = model.module.names if hasattr(model, "module") else model.names  # get class names
+            names = (
+                model.module.names if hasattr(model, "module") else model.names
+            )  # get class names
             LOGGER.info(f"Loaded weights from {weights}")
         else:
             raise ValueError("model must be a path to a .pt file")
@@ -268,8 +282,12 @@ class AHOY(nn.Module):
         inplace: bool = True,  # inplace modification of models
     ):
         super().__init__()
-        self.obj_det = ObjectsModel(obj_det_weigths, device=device, fp16=fp16, fuse=fuse)
-        self.hor_det = HorizonModel(hor_det_weights, device=device, fp16=fp16, fuse=fuse)
+        self.obj_det = ObjectsModel(
+            obj_det_weigths, device=device, fp16=fp16, fuse=fuse
+        )
+        self.hor_det = HorizonModel(
+            hor_det_weights, device=device, fp16=fp16, fuse=fuse
+        )
         self.device = select_device(device)
         self.fp16 = fp16
         self.stride = self.obj_det.stride
@@ -288,13 +306,17 @@ class AHOY(nn.Module):
         """Register hooks to convert uint8 to fp16/fp32 and scale by 1/255 before forward pass."""
         if "preprocessing" in self.hooks:
             return
-        self.hooks["preprocessing"] = self.register_forward_pre_hook(self._preprocessing_hook)
+        self.hooks["preprocessing"] = self.register_forward_pre_hook(
+            self._preprocessing_hook
+        )
 
     def register_postprocessing_hook(self):
         """Register hooks to convert half to float precision after forward pass."""
         if "postprocessing" in self.hooks:
             return
-        self.hooks["postprocessing"] = self.register_forward_hook(self._postprocessing_hook)
+        self.hooks["postprocessing"] = self.register_forward_hook(
+            self._postprocessing_hook
+        )
 
     def register_io_hooks(self):
         """Register hooks for input and output processing."""
@@ -460,7 +482,9 @@ class Hydra(BaseModel):
         if isinstance(model, DetectMultiBackend):
             model = model.model  # unwrap DetectMultiBackend
 
-        c_pitch, c_theta = _get_classification_heads(model, cutoff, self.nc_pitch, self.nc_theta)
+        c_pitch, c_theta = _get_classification_heads(
+            model, cutoff, self.nc_pitch, self.nc_theta
+        )
         model.save = set(list(model.save + [cutoff]))  # add cutoff to save
 
         # add classification heads to model
@@ -474,7 +498,11 @@ class Hydra(BaseModel):
             if isinstance(m.i, int) and m.i > self.cutoff:
                 continue
             if m.f != -1:  # if not from previous layer
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+                x = (
+                    y[m.f]
+                    if isinstance(m.f, int)
+                    else [x if j == -1 else y[j] for j in m.f]
+                )  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.type == "models.common.Classify" and "pitch" in m.i:
@@ -497,7 +525,11 @@ class Hydra(BaseModel):
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.f != -1:  # if not from previous layer
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+                x = (
+                    y[m.f]
+                    if isinstance(m.f, int)
+                    else [x if j == -1 else y[j] for j in m.f]
+                )  # from earlier layers
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
             if visualize:
@@ -509,7 +541,11 @@ class Hydra(BaseModel):
         y, dt = [], []  # outputs
         for m in self.model:
             if m.f != -1:  # if not from previous layer
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+                x = (
+                    y[m.f]
+                    if isinstance(m.f, int)
+                    else [x if j == -1 else y[j] for j in m.f]
+                )  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
             if m.type == "models.common.Classify" and "pitch" in m.i:
@@ -551,7 +587,9 @@ def _get_classification_heads(model, cutoff, nc_pitch, nc_theta):
 
     # get number of input channels for classification heads
     m = model.model[cutoff + 1]  # layer after cutoff
-    ch = m.conv.in_channels if hasattr(m, "conv") else m.cv1.conv.in_channels  # ch into module
+    ch = (
+        m.conv.in_channels if hasattr(m, "conv") else m.cv1.conv.in_channels
+    )  # ch into module
 
     # define classification heads
     c_pitch = Classify(ch, nc_pitch)
