@@ -23,9 +23,10 @@ import torch
 import wandb
 from fiftyone import ViewField as F
 from torch.cuda import amp
-from torch.nn import CrossEntropyLoss, Dropout
+from torch.nn import Dropout, Module
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
+from torch.nn.functional import cross_entropy
 from tqdm import tqdm
 
 wandb.login()
@@ -60,7 +61,9 @@ def get_dataloaders(
     if "RGB" in dataset_name:
         train_dataloader = get_train_rgb_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(train_tag)
+                fo.load_dataset(dataset_name)
+                .match(F(field) == [False])
+                .match_tags(train_tag)
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
@@ -69,7 +72,9 @@ def get_dataloaders(
 
         val_dataloader = get_val_rgb_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(val_tag)
+                fo.load_dataset(dataset_name)
+                .match(F(field) == [False])
+                .match_tags(val_tag)
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
@@ -78,7 +83,9 @@ def get_dataloaders(
     else:
         train_dataloader = get_train_ir16bit_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(train_tag)
+                fo.load_dataset(dataset_name)
+                .match(F(field) == [False])
+                .match_tags(train_tag)
                 # .take(1000, seed=51)
             ),
             imgsz=imgsz,
@@ -86,7 +93,9 @@ def get_dataloaders(
 
         val_dataloader = get_val_ir16bit_dataloader(
             dataset=(
-                fo.load_dataset(dataset_name).match(F(field) == [False]).match_tags(val_tag)
+                fo.load_dataset(dataset_name)
+                .match(F(field) == [False])
+                .match_tags(val_tag)
                 # .take(1000, seed=51)
             ),
             imgsz=imgsz,
@@ -95,11 +104,46 @@ def get_dataloaders(
     return train_dataloader, val_dataloader
 
 
+class FocalLoss(Module):
+    """
+    Focal loss for multi-class classification.
+    Implements the focal loss from the RetinaNet paper:
+    https://arxiv.org/abs/1708.02002
+
+    Args:
+        alpha (float): Weighting factor for the rare class (default: 1).
+        gamma (float): Focusing parameter (default: 2).
+        reduction (str): Reduction method for the loss (default: "mean").
+
+    Example:
+        >>> loss = FocalLoss(alpha=1, gamma=2, reduction="mean")
+        >>> inputs = torch.randn(3, 5, requires_grad=True)
+        >>> targets = torch.randint(0, 5, (3,))
+        >>> output = loss(inputs)
+    """
+
+    def __init__(self, alpha=1, gamma=2, reduction="mean"):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        ce_loss = cross_entropy(inputs, targets, reduction="none")
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+
+        if self.reduction == "mean":
+            return focal_loss.mean()
+        elif self.reduction == "sum":
+            return focal_loss.sum()
+        else:  # 'none'
+            return focal_loss
+
+
 def update(
     model: HorizonModel,
     train_dataloader: DataLoader,
-    loss_pitch: CrossEntropyLoss,
-    loss_theta: CrossEntropyLoss,
     pitch_weight: float,
     theta_weight: float,
     scaler: amp.GradScaler,
@@ -107,8 +151,14 @@ def update(
     ema: ModelEMA,
     epoch: int,
     epochs: int,
+    focal_alpha: float = 1,
+    focal_gamma: float = 2,
 ):
     """Update model weights via back-propagation."""
+
+    # Initialize Focal Loss
+    loss_pitch = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
+    loss_theta = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
 
     # initialize mean losses
     t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
@@ -136,7 +186,9 @@ def update(
         images, targets = images.to(model.device), targets.to(model.device)
 
         # process targets
-        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
+        pitch_i, theta_i = model.to_discrete(
+            pitch=targets[..., 0], theta=targets[..., 1]
+        )
 
         # forward
         x_pitch, x_theta = model(images)
@@ -149,7 +201,9 @@ def update(
 
         # Optimize
         scaler.unscale_(optimizer)  # unscale gradients
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)  # clip gradients
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(), max_norm=10.0
+        )  # clip gradients
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
@@ -180,13 +234,16 @@ def update(
 def evaluate(
     model: HorizonModel,
     val_dataloader: DataLoader,
-    loss_pitch: CrossEntropyLoss,
-    loss_theta: CrossEntropyLoss,
     pitch_weight: float,
     theta_weight: float,
     ema: ModelEMA,
+    focal_alpha: float = 1,
+    focal_gamma: float = 2,
 ):
     """Evaluate model on validation set."""
+    # Initialize Focal Loss
+    loss_pitch = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
+    loss_theta = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
 
     # use MSE as metric
     criterion_pitch = torch.nn.MSELoss()
@@ -220,7 +277,9 @@ def evaluate(
             x_pitch, x_theta = ema.ema(images)
 
         # process targets
-        pitch_i, theta_i = model.to_discrete(pitch=targets[..., 0], theta=targets[..., 1])
+        pitch_i, theta_i = model.to_discrete(
+            pitch=targets[..., 0], theta=targets[..., 1]
+        )
 
         # store losses
         _loss_pitch = loss_pitch(x_pitch, pitch_i)
@@ -233,8 +292,12 @@ def evaluate(
 
         # update running mean of MSE
         (y_pitch, _), (y_theta, _) = model.postprocess(x_pitch, x_theta)
-        mse_pitch = (mse_pitch * i + criterion_pitch(y_pitch, targets[..., 0]).item()) / (i + 1)
-        mse_theta = (mse_theta * i + criterion_theta(y_theta, targets[..., 1]).item()) / (i + 1)
+        mse_pitch = (
+            mse_pitch * i + criterion_pitch(y_pitch, targets[..., 0]).item()
+        ) / (i + 1)
+        mse_theta = (
+            mse_theta * i + criterion_theta(y_theta, targets[..., 1]).item()
+        ) / (i + 1)
 
         pbar.set_description(
             ("%22s" + "%11.4g" * 5)
@@ -265,47 +328,6 @@ def run(
     dropout: float = 0.25,  # dropout rate for classification heads
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
 ):
-    # create dir to store checkpoints
-    ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
-    LOGGER.info(f"{ckpt_dir=}\n")
-
-    if not os.path.exists(weights):
-        weights = attempt_download(weights)  # download if not found locally
-
-    # load as horizon model
-    model = HorizonModel(weights, nc_pitch, nc_theta, device=device)
-    for m in model.model:
-        print(m.i, m.f, m.type)
-    for m in model.modules():
-        if isinstance(m, Dropout) and dropout is not None:
-            m.p = dropout  # set dropout
-    for p in model.parameters():
-        p.requires_grad = True  # all params trainable
-    model.imgsz = imgsz
-    LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
-
-    # load dataloaders
-    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz)
-    LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
-
-    optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
-
-    lrf = 0.001  # final lr (fraction of lr0)
-    lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
-    scheduler = LambdaLR(optimizer, lr_lambda=lf)
-
-    loss_pitch = CrossEntropyLoss(label_smoothing=0.0)
-    loss_theta = CrossEntropyLoss(label_smoothing=0.0)
-
-    scaler = amp.GradScaler(enabled=model.device != "cpu")
-
-    ema = ModelEMA(model)
-    best_mse = 1e10
-
-    model.info()
-    LOGGER.info("Starting training...\n")
-
     wandb.init(
         project="yolo-horizon",
         entity="sea-ai",
@@ -326,6 +348,50 @@ def run(
         },
     )
 
+    # create dir to store checkpoints
+    ckpt_dir = (
+        ROOT / "runs" / "horizon" / "train" / dataset_name / datetime.now().isoformat()
+    )
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    LOGGER.info(f"{ckpt_dir=}\n")
+
+    if not os.path.exists(weights):
+        weights = attempt_download(weights)  # download if not found locally
+
+    # load as horizon model
+    model = HorizonModel(weights, nc_pitch, nc_theta, device=device)
+    for m in model.model:
+        print(m.i, m.f, m.type)
+    for m in model.modules():
+        if isinstance(m, Dropout) and dropout is not None:
+            m.p = dropout  # set dropout
+    for p in model.parameters():
+        p.requires_grad = True  # all params trainable
+    model.imgsz = imgsz
+    LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
+
+    # load dataloaders
+    train_dataloader, val_dataloader = get_dataloaders(
+        dataset_name, train_tag, val_tag, imgsz
+    )
+    LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
+
+    optimizer = smart_optimizer(
+        model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001
+    )
+
+    lrf = 0.001  # final lr (fraction of lr0)
+    lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
+    scheduler = LambdaLR(optimizer, lr_lambda=lf)
+
+    scaler = amp.GradScaler(enabled=model.device != "cpu")
+
+    ema = ModelEMA(model)
+    best_mse = 1e10
+
+    model.info()
+    LOGGER.info("Starting training...\n")
+
     for epoch in range(epochs):
         t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
         v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
@@ -334,8 +400,6 @@ def run(
         t_loss, t_ploss, t_tloss = update(
             model,
             train_dataloader,
-            loss_pitch,
-            loss_theta,
             pitch_weight,
             theta_weight,
             scaler,
@@ -349,7 +413,7 @@ def run(
 
         model.eval()
         v_loss, v_ploss, v_tloss, mse_pitch, mse_theta = evaluate(
-            model, val_dataloader, loss_pitch, loss_theta, pitch_weight, theta_weight, ema
+            model, val_dataloader, pitch_weight, theta_weight, ema
         )
 
         if mse_pitch + mse_theta < best_mse:
@@ -400,7 +464,9 @@ def run(
         }
 
         if epoch % 5 == 0:
-            log_dict["predictions"] = [wandb.Image(**img) for img in get_wb_images(model, val_dataloader, n=10)]
+            log_dict["predictions"] = [
+                wandb.Image(**img) for img in get_wb_images(model, val_dataloader, n=10)
+            ]
 
         wandb.run.log(log_dict)
 
@@ -442,7 +508,9 @@ def get_wb_images(model: HorizonModel, dataloader: DataLoader, n=10):
             (images[0, 0, ...] * 255).cpu().numpy().astype(np.uint8)
         )
 
-        gt_points = pitch_theta_to_points(targets[0], targets[1], input_hw=images.shape[-2:], orig_hw=im.shape[:2])
+        gt_points = pitch_theta_to_points(
+            targets[0], targets[1], input_hw=images.shape[-2:], orig_hw=im.shape[:2]
+        )
         gt_points = np.array(gt_points).astype(np.int32)
         gt_mask = np.zeros(im.shape, dtype=np.uint8)  # 0=background, 1=horizon
         cv2.line(gt_mask, gt_points[0], gt_points[1], color=1, thickness=4)
@@ -492,15 +560,28 @@ def remove_black_padding(image):
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser()
+    # show defaults in help
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument("--dataset_name", type=str, help="dataset name", required=True)
     parser.add_argument("--train_tag", type=str, default="train", help="train tag")
     parser.add_argument("--val_tag", type=str, default="val", help="val tag")
-    parser.add_argument("--weights", type=str, default="yolov5n.pt", help="initial weights path")
-    parser.add_argument("--nc_pitch", type=int, default=500, help="number of pitch classes")
-    parser.add_argument("--nc_theta", type=int, default=500, help="number of theta classes")
-    parser.add_argument("--pitch_weight", type=float, default=1.0, help="pitch loss weight")
-    parser.add_argument("--theta_weight", type=float, default=1.0, help="theta loss weight")
+    parser.add_argument(
+        "--weights", type=str, default="yolov5n.pt", help="initial weights path"
+    )
+    parser.add_argument(
+        "--nc_pitch", type=int, default=500, help="number of pitch classes"
+    )
+    parser.add_argument(
+        "--nc_theta", type=int, default=500, help="number of theta classes"
+    )
+    parser.add_argument(
+        "--pitch_weight", type=float, default=1.0, help="pitch loss weight"
+    )
+    parser.add_argument(
+        "--theta_weight", type=float, default=1.0, help="theta loss weight"
+    )
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
