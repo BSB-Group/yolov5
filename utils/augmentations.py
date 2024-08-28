@@ -20,7 +20,8 @@ FILL_VALUE = 0  # 114
 
 
 class Albumentations:
-    # YOLOv5 Albumentations class (optional, only used if package is installed)
+    """Provides optional data augmentation for YOLOv5 using Albumentations library if installed."""
+
     def __init__(self, size=640):
         """Initializes Albumentations class for optional data augmentation in YOLOv5 with specified input size."""
         self.transform = None
@@ -158,7 +159,6 @@ def random_perspective(
 ):
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
-
     """Applies random perspective transformation to an image, modifying the image and corresponding labels."""
     height = im.shape[0] + border[0] * 2  # shape(h,w,c)
     width = im.shape[1] + border[1] * 2
@@ -381,7 +381,8 @@ def classify_transforms(size=224):
 
 
 class LetterBox:
-    # YOLOv5 LetterBox class for image preprocessing, i.e. T.Compose([LetterBox(size), ToTensor()])
+    """Resizes and pads images to specified dimensions while maintaining aspect ratio for YOLOv5 preprocessing."""
+
     def __init__(self, size=(640, 640), auto=False, stride=32):
         """Initializes a LetterBox object for YOLOv5 image preprocessing with optional auto sizing and stride
         adjustment.
@@ -408,7 +409,8 @@ class LetterBox:
 
 
 class CenterCrop:
-    # YOLOv5 CenterCrop class for image preprocessing, i.e. T.Compose([CenterCrop(size), ToTensor()])
+    """Applies center crop to an image, resizing it to the specified size while maintaining aspect ratio."""
+
     def __init__(self, size=640):
         """Initializes CenterCrop for image preprocessing, accepting single int or tuple for size, defaults to 640."""
         super().__init__()
@@ -427,7 +429,8 @@ class CenterCrop:
 
 
 class ToTensor:
-    # YOLOv5 ToTensor class for image preprocessing, i.e. T.Compose([LetterBox(size), ToTensor()])
+    """Converts BGR np.array image from HWC to RGB CHW format, normalizes to [0, 1], and supports FP16 if half=True."""
+
     def __init__(self, half=False):
         """Initializes ToTensor for YOLOv5 image preprocessing, with optional half precision (half=True for FP16)."""
         super().__init__()
