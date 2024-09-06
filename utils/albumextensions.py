@@ -1,7 +1,7 @@
 """Custom augmentations following the Albumentations API."""
 
 import random
-from typing import Dict, Sequence, Tuple, Union
+from typing import Dict, Tuple
 
 import cv2
 import numpy as np
@@ -11,7 +11,7 @@ from albumentations.core.transforms_interface import (
     DualTransform,
     KeypointInternalType,
 )
-
+from albumentations.augmentations.geometric.resize import MaxSizeInitSchema
 
 class ResizeIfNeeded(DualTransform):
     """
@@ -29,15 +29,17 @@ class ResizeIfNeeded(DualTransform):
     Image types:
         uint8, float32
     """
+    class InitSchema(MaxSizeInitSchema):
+        pass
 
     def __init__(
         self,
-        max_size: Union[int, Sequence[int]] = 1024,
+        max_size: int | None = 1024,
         interpolation: int = cv2.INTER_LINEAR,
         always_apply: bool = False,
         p: float = 1,
     ):
-        super(ResizeIfNeeded, self).__init__(always_apply, p)
+        super().__init__(p=p, always_apply=always_apply)
         self.interpolation = interpolation
         self.max_size = max_size
 
