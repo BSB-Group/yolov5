@@ -622,7 +622,7 @@ def export_coreml(model, im, file, int8, half, nms, mlmodel, prefix=colorstr("Co
 
 
 @try_export
-def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr("TensorRT:")):
+def export_engine(model, im, file, half, dynamic, simplify, workspace=4, onnx_only=False, verbose=False, prefix=colorstr("TensorRT:")):
     """
     Export a YOLOv5 model to TensorRT engine format, requiring GPU and TensorRT>=7.0.0.
 
@@ -634,6 +634,7 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
         dynamic (bool): Set to True to enable dynamic input shapes.
         simplify (bool): Set to True to simplify the model during export.
         workspace (int): Workspace size in GB (default is 4).
+        onnx_only (bool): Set to True to only export the ONNX model.
         verbose (bool): Set to True for verbose logging output.
         prefix (str): Log message prefix.
 
@@ -657,6 +658,10 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
         export_engine(model.model, input_tensor, export_path, half=True, dynamic=True, simplify=True, workspace=8, verbose=True)
         ```
     """
+    if onnx_only:
+        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        return file.with_suffix(".onnx"), None
+
     if isinstance(im, (list, tuple)):
         assert all(
             i.device.type != "cpu" for i in im
@@ -665,14 +670,13 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
         assert im.device.type != "cpu", "export running on CPU but must be on GPU, i.e. `python export.py --device 0`"
     try:
         import tensorrt as trt
-
-        from models.custom import AHOY, DAN
     except Exception:
         if platform.system() == "Linux":
             check_requirements("nvidia-tensorrt", cmds="-U --index-url https://pypi.ngc.nvidia.com")
         import tensorrt as trt
 
     if trt.__version__[0] == "7":  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
+        from models.custom import AHOY, DAN
         if isinstance(model, AHOY):
             grid = model.obj_det.model[-1].anchor_grid
             model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]

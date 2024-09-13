@@ -8,7 +8,7 @@ Example usage:
         --batch-size 2 \
         --half \
         --fuse \
-        --engine-fname ahoy.engine
+        --fname ahoy.engine
 
     python export_hybrid.py \
         --det-weights /path/to/obj_det_weights.pt /path/to/ir_obj_det_weights.pt \
@@ -17,7 +17,7 @@ Example usage:
         --batch-size 2 2 \
         --half \
         --fuse \
-        --engine-fname dan.engine
+        --fname dan.engine
 """
 
 import argparse
@@ -90,14 +90,14 @@ def main(
     half: bool,
     fuse: bool,
     input_as_fp32: bool = False,
-    engine_fname: str = "",
+    fname: str = "",
 ):
     """Export the model to TensorRT engine."""
 
     model = init_model(det_weights, hor_weights, half, fuse)
-    if not engine_fname:
-        engine_fname = get_engine_fname(model, batch_size, imgsz)
-    print(f"🚀 Exporting model {type(model).__name__} to {engine_fname}...")
+    if not fname:
+        fname = get_engine_fname(model, batch_size, imgsz)
+    print(f"🚀 Exporting model {type(model).__name__} to {fname}...")
 
     inplace = False  # default
     dynamic = False  # default
@@ -122,15 +122,16 @@ def main(
         print(f"🔮 Dummy input...{image.shape}")
         model(image)
 
-    export_engine(
+    f, _ = export_engine(
         model,
         im=image,
-        file=Path(engine_fname),
+        file=Path(fname),
         half=half,
         dynamic=dynamic,
         simplify=False,
+        onnx_only=fname.endswith(".onnx"),
     )
-    print(f"🎉 Model successfully exported to {engine_fname}! Ready to deploy! 🚀")
+    print(f"🎉 Model successfully exported to {f}! Ready to deploy! 🚀")
 
 
 def _parse_args():
@@ -186,11 +187,11 @@ def _parse_args():
         help="Input image as FP32.",
     )
     parser.add_argument(
-        "-ef",
-        "--engine-fname",
+        "-f",
+        "--fname",
         type=str,
         default="",
-        help="Filename for the exported TensorRT engine.",
+        help="Filename for the exported model (engine or onnx).",
     )
     return parser.parse_args()
 
