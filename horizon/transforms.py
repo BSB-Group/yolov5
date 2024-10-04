@@ -89,7 +89,7 @@ def horizon_augment_ir16bit(imgsz: int) -> A.Compose:
         [
             # image transforms (16-bit compatible)
             A16.Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
-            A16.CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(-1, -1)),
+            A16.CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(0, 0)),
             A16.NormalizeMinMax(p=1.0),
             A.UnsharpMask(p=0.5, threshold=5),
             A.ToRGB(p=1.0),
@@ -129,7 +129,7 @@ def horizon_base_ir16bit(
         [
             # image transforms (16-bit compatible)
             A16.Clip(p=1.0, lower_limit=(lower_limit,) * 2, upper_limit=(upper_limit,) * 2),
-            A16.CLAHE(p=1.0 if clahe else 0.0, clip_limit=(4, 4), tile_grid_size=(-1, -1)),
+            A16.CLAHE(p=1.0 if clahe else 0.0, clip_limit=(4, 4), tile_grid_size=(0, 0)),
             A16.NormalizeMinMax(p=1.0),
             A.UnsharpMask(p=1.0 if unsharp_mask else 0.0, threshold=5),
             A.ToRGB(p=1.0),
