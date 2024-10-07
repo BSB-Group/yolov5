@@ -134,7 +134,7 @@ def train(hyp, opt, device, callbacks):
         - Datasets: https://github.com/ultralytics/yolov5/tree/master/data
         - Tutorial: https://docs.ultralytics.com/yolov5/tutorials/train_custom_data
     """
-    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = (
+    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze, image_compression = (
         Path(opt.save_dir),
         opt.epochs,
         opt.batch_size,
@@ -148,6 +148,7 @@ def train(hyp, opt, device, callbacks):
         opt.nosave,
         opt.workers,
         opt.freeze,
+        opt.image_compression
     )
     callbacks.run("on_pretrain_routine_start")
 
@@ -300,6 +301,7 @@ def train(hyp, opt, device, callbacks):
         prefix=colorstr("train: "),
         shuffle=True,
         seed=opt.seed,
+        image_compression = image_compression
     )
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
@@ -320,6 +322,7 @@ def train(hyp, opt, device, callbacks):
             workers=workers * 2,
             pad=0.5,
             prefix=colorstr("val: "),
+            image_compression = image_compression,
         )[0]
 
         if not resume:
@@ -470,6 +473,7 @@ def train(hyp, opt, device, callbacks):
                     plots=False,
                     callbacks=callbacks,
                     compute_loss=compute_loss,
+                    image_compression = image_compression
                 )
 
             # Update best mAP
@@ -535,6 +539,7 @@ def train(hyp, opt, device, callbacks):
                         plots=plots,
                         callbacks=callbacks,
                         compute_loss=compute_loss,
+                        image_compression = image_compression,
                     )  # val best model with plots
                     if is_coco:
                         callbacks.run("on_fit_epoch_end", list(mloss) + list(results) + lr, epoch, best_fitness, fi)
@@ -609,6 +614,9 @@ def parse_opt(known=False):
 
     # close mosaic (a value between 10 and 15 seems to work fine)
     parser.add_argument("--close-mosaic", type=int, default=0, help="Close mosaic N epochs before end. 0 to disable")
+
+    # introduce compression artifacts (value from 0 to 1.0)
+    parser.add_argument("--image-compression", type=int, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
 
     # Logger arguments
     parser.add_argument("--entity", default=None, help="Entity")

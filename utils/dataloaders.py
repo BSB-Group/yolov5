@@ -177,6 +177,7 @@ def create_dataloader(
     prefix="",
     shuffle=False,
     seed=0,
+    image_compression_p=0.9,
 ):
     """Creates and returns a configured DataLoader instance for loading and processing image datasets."""
     if rect and shuffle:
@@ -197,6 +198,7 @@ def create_dataloader(
             image_weights=image_weights,
             prefix=prefix,
             rank=rank,
+            image_compression_p = image_compression_p,
         )
 
     batch_size = min(batch_size, len(dataset))
@@ -561,6 +563,7 @@ class LoadImagesAndLabels(Dataset):
         prefix="",
         rank=-1,
         seed=0,
+        image_compression=0.9,
     ):
         """Initializes the YOLOv5 dataset loader, handling images and their labels, caching, and preprocessing."""
         self.img_size = img_size
@@ -572,7 +575,7 @@ class LoadImagesAndLabels(Dataset):
         self.mosaic_border = [-img_size // 2, -img_size // 2]
         self.stride = stride
         self.path = path
-        self.albumentations = Albumentations(size=img_size) if augment else None
+        self.albumentations = Albumentations(size=img_size, p=image_compression) if augment else None
 
         try:
             f = []  # image files
