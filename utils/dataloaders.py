@@ -177,7 +177,7 @@ def create_dataloader(
     prefix="",
     shuffle=False,
     seed=0,
-    image_compression_p=0.9,
+    image_compression=0.9,
 ):
     """Creates and returns a configured DataLoader instance for loading and processing image datasets."""
     if rect and shuffle:
@@ -198,7 +198,7 @@ def create_dataloader(
             image_weights=image_weights,
             prefix=prefix,
             rank=rank,
-            image_compression_p = image_compression_p,
+            image_compression=image_compression,
         )
 
     batch_size = min(batch_size, len(dataset))
