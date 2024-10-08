@@ -253,6 +253,7 @@ def run(
         plots (bool, optional): Plot validation images and metrics. Default is True.
         callbacks (utils.callbacks.Callbacks, optional): Callbacks for logging and monitoring. Default is Callbacks().
         compute_loss (function, optional): Loss function for training. Default is None.
+        image_compression (float, optional): Image compression probability (data Augmentation). Default is 0.9 and 0 to disable.
 
     Returns:
         dict: Contains performance metrics including precision, recall, mAP50, and mAP50-95.
@@ -565,7 +566,7 @@ def parse_opt():
     parser.add_argument("--half", action="store_true", help="use FP16 half-precision inference")
     parser.add_argument("--dnn", action="store_true", help="use OpenCV DNN for ONNX inference")
     parser.add_argument("--hyp", type=str, default="", help="hyperparameters path")
-    parser.add_argument("--image-compression", type=int, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument("--image-compression", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
 
     opt = parser.parse_args()
     opt.data = check_yaml(opt.data)  # check YAML

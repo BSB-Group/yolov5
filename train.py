@@ -616,7 +616,7 @@ def parse_opt(known=False):
     parser.add_argument("--close-mosaic", type=int, default=0, help="Close mosaic N epochs before end. 0 to disable")
 
     # introduce compression artifacts (value from 0 to 1.0)
-    parser.add_argument("--image-compression", type=int, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument("--image-compression", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
 
     # Logger arguments
     parser.add_argument("--entity", default=None, help="Entity")
@@ -974,7 +974,8 @@ def run(**kwargs):
         save_period (int, optional): Frequency in epochs to save checkpoints. Disabled if < 1. Defaults to -1.
         seed (int, optional): Global training random seed. Defaults to 0.
         local_rank (int, optional): Automatic DDP Multi-GPU argument. Do not modify. Defaults to -1.
-
+        image_compression (float, optional): Image compression probability (data Augmentation). Default is 0.9 and 0 to disable.
+        
     Returns:
         None: The function initiates YOLOv5 training or hyperparameter evolution based on the provided options.
 
