@@ -134,7 +134,7 @@ def train(hyp, opt, device, callbacks):
         - Datasets: https://github.com/ultralytics/yolov5/tree/master/data
         - Tutorial: https://docs.ultralytics.com/yolov5/tutorials/train_custom_data
     """
-    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze, image_compression = (
+    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze, im_compression_prob = (
         Path(opt.save_dir),
         opt.epochs,
         opt.batch_size,
@@ -148,7 +148,7 @@ def train(hyp, opt, device, callbacks):
         opt.nosave,
         opt.workers,
         opt.freeze,
-        opt.image_compression
+        opt.im_compression_prob
     )
     callbacks.run("on_pretrain_routine_start")
 
@@ -301,7 +301,7 @@ def train(hyp, opt, device, callbacks):
         prefix=colorstr("train: "),
         shuffle=True,
         seed=opt.seed,
-        image_compression = image_compression
+        im_compression_prob = im_compression_prob
     )
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
@@ -322,7 +322,6 @@ def train(hyp, opt, device, callbacks):
             workers=workers * 2,
             pad=0.5,
             prefix=colorstr("val: "),
-            image_compression = image_compression,
         )[0]
 
         if not resume:
@@ -473,7 +472,6 @@ def train(hyp, opt, device, callbacks):
                     plots=False,
                     callbacks=callbacks,
                     compute_loss=compute_loss,
-                    image_compression = image_compression
                 )
 
             # Update best mAP
@@ -539,7 +537,6 @@ def train(hyp, opt, device, callbacks):
                         plots=plots,
                         callbacks=callbacks,
                         compute_loss=compute_loss,
-                        image_compression = image_compression,
                     )  # val best model with plots
                     if is_coco:
                         callbacks.run("on_fit_epoch_end", list(mloss) + list(results) + lr, epoch, best_fitness, fi)
@@ -616,7 +613,7 @@ def parse_opt(known=False):
     parser.add_argument("--close-mosaic", type=int, default=0, help="Close mosaic N epochs before end. 0 to disable")
 
     # introduce compression artifacts (value from 0 to 1.0)
-    parser.add_argument("--image-compression", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument("--im-compression-prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
 
     # Logger arguments
     parser.add_argument("--entity", default=None, help="Entity")
@@ -974,7 +971,7 @@ def run(**kwargs):
         save_period (int, optional): Frequency in epochs to save checkpoints. Disabled if < 1. Defaults to -1.
         seed (int, optional): Global training random seed. Defaults to 0.
         local_rank (int, optional): Automatic DDP Multi-GPU argument. Do not modify. Defaults to -1.
-        image_compression (float, optional): Image compression probability (data Augmentation). Default is 0.9 and 0 to disable.
+        im_compression_prob (float, optional): Image compression probability (data Augmentation). Default is 0.9 and 0 to disable.
         
     Returns:
         None: The function initiates YOLOv5 training or hyperparameter evolution based on the provided options.

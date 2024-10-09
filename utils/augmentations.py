@@ -22,7 +22,7 @@ FILL_VALUE = 0  # 114
 class Albumentations:
     """Provides optional data augmentation for YOLOv5 using Albumentations library if installed."""
 
-    def __init__(self, size=640, image_compression=0.9):
+    def __init__(self, size=640, im_compression_prob=0.9):
         """Initializes Albumentations class for optional data augmentation in YOLOv5 with specified input size and image compression probability."""
         self.transform = None
         prefix = colorstr("albumentations: ")
@@ -39,7 +39,7 @@ class Albumentations:
                 A.CLAHE(p=0.01),
                 A.RandomBrightnessContrast(p=0.0),
                 A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=50, p=image_compression),
+                A.ImageCompression(quality_lower=50, p=im_compression_prob),
             ]  # transforms
             self.transform = A.Compose(T, bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]))
 

@@ -217,7 +217,6 @@ def run(
     callbacks=Callbacks(),
     compute_loss=None,
     hyp=None,
-    image_compression=0.9
 ):
     """
     Evaluates a YOLOv5 model on a dataset and logs performance metrics.
@@ -253,7 +252,6 @@ def run(
         plots (bool, optional): Plot validation images and metrics. Default is True.
         callbacks (utils.callbacks.Callbacks, optional): Callbacks for logging and monitoring. Default is Callbacks().
         compute_loss (function, optional): Loss function for training. Default is None.
-        image_compression (float, optional): Image compression probability (data Augmentation). Default is 0.9 and 0 to disable.
 
     Returns:
         dict: Contains performance metrics including precision, recall, mAP50, and mAP50-95.
@@ -326,8 +324,7 @@ def run(
             pad=pad,
             rect=rect,
             workers=workers,
-            prefix=colorstr(f"{task}: "),
-            image_compression=image_compression,
+            prefix=colorstr(f"{task}: ")
         )[0]
 
     seen = 0
