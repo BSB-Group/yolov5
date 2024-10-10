@@ -266,8 +266,8 @@ def run(
     imgsz: int = 640,  # model input size (assumes squared input)
     epochs: int = 100,
     dropout: float = 0.25,  # dropout rate for classification heads
-    device: str = "cuda" if torch.cuda.is_available() else "cpu",
     im_compression_prob: float = 0.9,
+    device: str = "cuda" if torch.cuda.is_available() else "cpu",
 ):
     # create dir to store checkpoints
     ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
@@ -509,13 +509,12 @@ def parse_args():
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
+    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
     parser.add_argument(
         "--device",
         default="cuda" if torch.cuda.is_available() else "cpu",
         help="cuda device, i.e. 0 or 0,1,2,3 or cpu",
     )
-    # introduce compression artifacts (value from 0 to 1.0)
-    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
     return parser.parse_args()
 
 
