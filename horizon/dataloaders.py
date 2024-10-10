@@ -25,11 +25,12 @@ def get_train_rgb_dataloader(
     shuffle: bool = True,
     pin_memory: bool = False,
     dataloader_kwargs: dict = None,
+    im_compression_prob:float = 0.9,
 ):
     """Get training set dataloader for an RGB dataset."""
     dataset = HorizonDataset(
         dataset=dataset,
-        transform=T.horizon_augment_rgb(imgsz),
+        transform=T.horizon_augment_rgb(imgsz, im_compression_prob),
         target_transform=T.points_to_normalised_pitch_theta(imgsz),
     )
     return DataLoader(
@@ -75,11 +76,12 @@ def get_train_ir16bit_dataloader(
     shuffle: bool = True,
     pin_memory: bool = False,
     dataloader_kwargs: dict = None,
+    im_compression_prob: float = 0.9,
 ):
     """Get training set dataloader for an ir16bit dataset."""
     dataset = HorizonDataset(
         dataset=dataset,
-        transform=T.horizon_augment_ir16bit(imgsz),
+        transform=T.horizon_augment_ir16bit(imgsz, im_compression_prob),
         target_transform=T.points_to_normalised_pitch_theta(imgsz),
         replace_8bit_path=True,
     )

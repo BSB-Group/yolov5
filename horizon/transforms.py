@@ -17,17 +17,20 @@ from albumentations.pytorch.transforms import ToTensorV2
 import utils.albumentations16 as A16
 import utils.albumextensions as Ax
 from utils.horizon import points_to_pitch_theta  # points_to_hough
+from utils.general import LOGGER, colorstr
 
 
-def horizon_augment_rgb(imgsz: int) -> A.Compose:
+def horizon_augment_rgb(imgsz: int, im_compression_prob:float) -> A.Compose:
     """
     Augmentations for RGB images.
 
     Args:
         imgsz (int): image size
+        im_compression_prob (float): Image compression propability 
+
     """
-    return A.Compose(
-        [
+    prefix = colorstr("albumentations: ")
+    T = [
             # weather transforms
             A.OneOf(
                 [
@@ -43,6 +46,7 @@ def horizon_augment_rgb(imgsz: int) -> A.Compose:
             A.HueSaturationValue(p=0.5),
             A.CLAHE(p=0.05),
             A.Blur(p=0.05),
+            A.ImageCompression(quality_lower=50, p=im_compression_prob),
             # geometric transforms
             Ax.ResizeIfNeeded(max_size=imgsz),
             A.HorizontalFlip(p=0.5),
@@ -53,9 +57,9 @@ def horizon_augment_rgb(imgsz: int) -> A.Compose:
             # torch-related transforms
             A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
             ToTensorV2(p=1.0),
-        ],
-        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
-    )
+        ]
+    LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))
+    return A.Compose(T,keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
 
 
 def horizon_base_rgb(imgsz: int) -> A.Compose:
@@ -78,21 +82,24 @@ def horizon_base_rgb(imgsz: int) -> A.Compose:
     )
 
 
-def horizon_augment_ir16bit(imgsz: int) -> A.Compose:
+def horizon_augment_ir16bit(imgsz: int, im_compression_prob:float) -> A.Compose:
     """
     Augmentations for 16-bit IR images.
 
     Args:
         imgsz (int): image size
+        im_compression_prob (float): Image compression propability 
     """
-    return A.Compose(
-        [
+    prefix = colorstr("albumentations: ")
+    
+    T = [
             # image transforms (16-bit compatible)
             A16.Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
             A16.CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(0, 0)),
             A16.NormalizeMinMax(p=1.0),
             A.UnsharpMask(p=0.5, threshold=5),
             A.ToRGB(p=1.0),
+            A.ImageCompression(quality_lower=50, p=im_compression_prob),
             # geometric transforms
             Ax.ResizeIfNeeded(max_size=imgsz),
             A.HorizontalFlip(p=0.5),
@@ -103,9 +110,9 @@ def horizon_augment_ir16bit(imgsz: int) -> A.Compose:
             # torch-related transforms
             A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
             ToTensorV2(p=1.0),
-        ],
-        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
-    )
+        ]
+    LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))
+    return A.Compose(T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
 
 
 def horizon_base_ir16bit(
