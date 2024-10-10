@@ -29,7 +29,8 @@ def horizon_augment_rgb(imgsz: int, im_compression_prob:float) -> A.Compose:
         im_compression_prob (float): Image compression propability 
 
     """
-    prefix = colorstr("albumentations: ")
+
+    prefix = colorstr("albumentations train rgb: ")
     T = [
             # weather transforms
             A.OneOf(
@@ -69,8 +70,9 @@ def horizon_base_rgb(imgsz: int) -> A.Compose:
     Args:
         imgsz (int): image size
     """
-    return A.Compose(
-        [
+
+    prefix = colorstr("albumentations val rgb: ")
+    T = [
             # geometric transforms
             Ax.ResizeIfNeeded(max_size=imgsz),
             A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
@@ -78,8 +80,8 @@ def horizon_base_rgb(imgsz: int) -> A.Compose:
             A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
             ToTensorV2(p=1.0),
         ],
-        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
-    )
+    LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))
+    return A.Compose(T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
 
 
 def horizon_augment_ir16bit(imgsz: int, im_compression_prob:float) -> A.Compose:
@@ -90,8 +92,8 @@ def horizon_augment_ir16bit(imgsz: int, im_compression_prob:float) -> A.Compose:
         imgsz (int): image size
         im_compression_prob (float): Image compression propability 
     """
-    prefix = colorstr("albumentations: ")
-    
+
+    prefix = colorstr("albumentations train ir16bit: ")
     T = [
             # image transforms (16-bit compatible)
             A16.Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
@@ -132,8 +134,9 @@ def horizon_base_ir16bit(
         clahe (bool): apply CLAHE
         unsharp_mask (bool): apply unsharp mask
     """
-    return A.Compose(
-        [
+
+    prefix = colorstr("albumentations val ir16bit: ")
+    T = [
             # image transforms (16-bit compatible)
             A16.Clip(p=1.0, lower_limit=(lower_limit,) * 2, upper_limit=(upper_limit,) * 2),
             A16.CLAHE(p=1.0 if clahe else 0.0, clip_limit=(4, 4), tile_grid_size=(0, 0)),
@@ -146,9 +149,9 @@ def horizon_base_ir16bit(
             # torch-related transforms
             A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
             ToTensorV2(p=1.0),
-        ],
-        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
-    )
+        ]
+    LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))    
+    return A.Compose(T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
 
 
 def points_to_normalised_pitch_theta(imgsz: int):

@@ -116,6 +116,10 @@ class NormalizeMinMax(ImageOnlyTransform):
 
     def apply(self, img, **params):
         return cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+    def get_transform_init_args_names(self):
+        # This transform does not require any initialization arguments for logging/serialization
+        # Hence, we return an empty tuple.
+        return ()
 
 
 class Clip(ImageOnlyTransform):
@@ -161,3 +165,7 @@ class Clip(ImageOnlyTransform):
             "lower_limit": random.uniform(self.lower_limit[0], self.lower_limit[1]),
             "upper_limit": random.uniform(self.upper_limit[0], self.upper_limit[1]),
         }
+    
+    def get_transform_init_args_names(self):
+        # This method allows Albumentations to retrieve the initialization arguments for logging
+        return ("lower_limit", "upper_limit")    
