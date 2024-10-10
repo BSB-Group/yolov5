@@ -514,7 +514,7 @@ def parse_args():
         help="cuda device, i.e. 0 or 0,1,2,3 or cpu",
     )
     # introduce compression artifacts (value from 0 to 1.0)
-    parser.add_argument("--im-compression-prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
     return parser.parse_args()
 
 
