@@ -324,7 +324,7 @@ def run(
             pad=pad,
             rect=rect,
             workers=workers,
-            prefix=colorstr(f"{task}: "),
+            prefix=colorstr(f"{task}: ")
         )[0]
 
     seen = 0
@@ -563,6 +563,8 @@ def parse_opt():
     parser.add_argument("--half", action="store_true", help="use FP16 half-precision inference")
     parser.add_argument("--dnn", action="store_true", help="use OpenCV DNN for ONNX inference")
     parser.add_argument("--hyp", type=str, default="", help="hyperparameters path")
+    parser.add_argument("--image-compression", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+
     opt = parser.parse_args()
     opt.data = check_yaml(opt.data)  # check YAML
     opt.hyp = check_yaml(opt.hyp) if opt.hyp else opt.hyp  # check YAML
