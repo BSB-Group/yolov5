@@ -6,11 +6,8 @@ from typing import Dict, Tuple
 import cv2
 import numpy as np
 from albumentations.augmentations.geometric import functional as F
-from albumentations.core.transforms_interface import (
-    BoxInternalType,
-    DualTransform,
-    KeypointInternalType,
-)
+from albumentations.core.transforms_interface import DualTransform
+
 from albumentations.augmentations.geometric.resize import MaxSizeInitSchema
 
 class ResizeIfNeeded(DualTransform):
@@ -54,17 +51,17 @@ class ResizeIfNeeded(DualTransform):
             return F.longest_max_size(img, max_size=max_size, interpolation=interpolation)
         return img  # skip the transformation (don't scale up)
 
-    def apply_to_bbox(self, bbox: BoxInternalType, **params) -> BoxInternalType:
+    def apply_to_bbox(self, bbox: np.ndarray, **params) -> np.ndarray:
         # Bounding box coordinates are scale invariant
         return bbox
 
-    def apply_to_keypoint(self, keypoint: KeypointInternalType, max_size: int = 1024, **params) -> KeypointInternalType:
+    def apply_to_keypoint(self, keypoint: np.ndarray, max_size: int = 1024, **params) -> np.ndarray:
         height = params["rows"]
         width = params["cols"]
 
         scale = max_size / max([height, width])
         scale = min(1.0, scale)  # don't scale up
-        return F.keypoint_scale(keypoint, scale, scale)
+        return F.keypoints_scale(keypoint, scale, scale)
 
     def get_params(self) -> Dict[str, int]:
         return {"max_size": (self.max_size if isinstance(self.max_size, int) else random.choice(self.max_size))}
