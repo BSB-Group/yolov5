@@ -50,12 +50,12 @@ def horizon_augment_rgb(
         A.HueSaturationValue(p=0.5),
         A.CLAHE(p=0.05),
         A.Blur(p=0.05),
-        A.ImageCompression(quality_lower=50, p=im_compression_prob),
+        A.ImageCompression(quality_lower=75, p=im_compression_prob),
         # geometric transforms
         Ax.ResizeIfNeeded(max_size=imgsz),
         A.HorizontalFlip(p=0.5),
         A.PadIfNeeded(
-            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT, value=0
         ),  # letterbox
         A.ShiftScaleRotate(
             p=1,
@@ -63,6 +63,7 @@ def horizon_augment_rgb(
             scale_limit=0.25,
             rotate_limit=30,
             border_mode=cv2.BORDER_CONSTANT,
+            value=0,
         ),
         # torch-related transforms
         A.Normalize(
@@ -90,7 +91,10 @@ def horizon_base_rgb(imgsz: int) -> A.Compose:
             # geometric transforms
             Ax.ResizeIfNeeded(max_size=imgsz),
             A.PadIfNeeded(
-                min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+                min_height=imgsz,
+                min_width=imgsz,
+                border_mode=cv2.BORDER_CONSTANT,
+                value=0,
             ),  # letterbox
             # torch-related transforms
             A.Normalize(
@@ -125,7 +129,7 @@ def horizon_augment_ir16bit(
         Ax.ResizeIfNeeded(max_size=imgsz),
         A.HorizontalFlip(p=0.5),
         A.PadIfNeeded(
-            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT, value=0
         ),  # letterbox
         A.ShiftScaleRotate(
             p=1,
@@ -133,6 +137,7 @@ def horizon_augment_ir16bit(
             scale_limit=0.25,
             rotate_limit=20,
             border_mode=cv2.BORDER_CONSTANT,
+            value=0,
         ),
         # torch-related transforms
         A.Normalize(
@@ -180,7 +185,10 @@ def horizon_base_ir16bit(
             # geometric transforms
             Ax.ResizeIfNeeded(max_size=imgsz),
             A.PadIfNeeded(
-                min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+                min_height=imgsz,
+                min_width=imgsz,
+                border_mode=cv2.BORDER_CONSTANT,
+                value=0,
             ),  # letterbox
             # torch-related transforms
             A.Normalize(
