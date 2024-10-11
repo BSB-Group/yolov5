@@ -20,47 +20,62 @@ from utils.horizon import points_to_pitch_theta  # points_to_hough
 from utils.general import LOGGER, colorstr
 
 
-def horizon_augment_rgb(imgsz: int, im_compression_prob:float) -> A.Compose:
+def horizon_augment_rgb(
+    imgsz: int,
+    im_compression_prob: float,
+    prefix=colorstr("albumentations rgb:"),
+) -> A.Compose:
     """
     Augmentations for RGB images.
 
     Args:
         imgsz (int): image size
-        im_compression_prob (float): Image compression propability 
+        im_compression_prob (float): Image compression propability
 
     """
 
-    prefix = colorstr("albumentations train rgb: ")
     T = [
-            # weather transforms
-            A.OneOf(
-                [
-                    A.RandomRain(p=1),
-                    A.RandomSunFlare(p=1),
-                    A.RandomFog(p=1, fog_coef_lower=0.1, fog_coef_upper=0.3),
-                ],
-                p=0.05,
-            ),
-            # image transforms
-            A.RandomCropFromBorders(p=0.2),
-            A.RandomBrightnessContrast(p=0.5),
-            A.HueSaturationValue(p=0.5),
-            A.CLAHE(p=0.05),
-            A.Blur(p=0.05),
-            A.ImageCompression(quality_lower=50, p=im_compression_prob),
-            # geometric transforms
-            Ax.ResizeIfNeeded(max_size=imgsz),
-            A.HorizontalFlip(p=0.5),
-            A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
-            A.ShiftScaleRotate(
-                p=1, shift_limit=0.1, scale_limit=0.25, rotate_limit=30, border_mode=cv2.BORDER_CONSTANT
-            ),
-            # torch-related transforms
-            A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
-            ToTensorV2(p=1.0),
-        ]
-    LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))
-    return A.Compose(T,keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
+        # weather transforms
+        A.OneOf(
+            [
+                A.RandomRain(p=1),
+                A.RandomSunFlare(p=1),
+                A.RandomFog(p=1, fog_coef_lower=0.1, fog_coef_upper=0.3),
+            ],
+            p=0.05,
+        ),
+        # image transforms
+        A.RandomCropFromBorders(p=0.2),
+        A.RandomBrightnessContrast(p=0.5),
+        A.HueSaturationValue(p=0.5),
+        A.CLAHE(p=0.05),
+        A.Blur(p=0.05),
+        A.ImageCompression(quality_lower=50, p=im_compression_prob),
+        # geometric transforms
+        Ax.ResizeIfNeeded(max_size=imgsz),
+        A.HorizontalFlip(p=0.5),
+        A.PadIfNeeded(
+            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+        ),  # letterbox
+        A.ShiftScaleRotate(
+            p=1,
+            shift_limit=0.1,
+            scale_limit=0.25,
+            rotate_limit=30,
+            border_mode=cv2.BORDER_CONSTANT,
+        ),
+        # torch-related transforms
+        A.Normalize(
+            mean=0.0, std=1.0
+        ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+        ToTensorV2(p=1.0),
+    ]
+    LOGGER.info(
+        prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p)
+    )
+    return A.Compose(
+        T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False)
+    )
 
 
 def horizon_base_rgb(imgsz: int) -> A.Compose:
@@ -74,46 +89,63 @@ def horizon_base_rgb(imgsz: int) -> A.Compose:
         [
             # geometric transforms
             Ax.ResizeIfNeeded(max_size=imgsz),
-            A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
+            A.PadIfNeeded(
+                min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+            ),  # letterbox
             # torch-related transforms
-            A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+            A.Normalize(
+                mean=0.0, std=1.0
+            ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
             ToTensorV2(p=1.0),
         ],
         keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
     )
 
 
-def horizon_augment_ir16bit(imgsz: int, im_compression_prob:float) -> A.Compose:
+def horizon_augment_ir16bit(
+    imgsz: int, im_compression_prob: float, prefix=colorstr("albumentations ir16bit:")
+) -> A.Compose:
     """
     Augmentations for 16-bit IR images.
 
     Args:
         imgsz (int): image size
-        im_compression_prob (float): Image compression propability 
+        im_compression_prob (float): Image compression propability
     """
 
-    prefix = colorstr("albumentations ir16bit: ")
     T = [
-            # image transforms (16-bit compatible)
-            A16.Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
-            A16.CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(0, 0)),
-            A16.NormalizeMinMax(p=1.0),
-            A.UnsharpMask(p=0.5, threshold=5),
-            A.ToRGB(p=1.0),
-            A.ImageCompression(quality_lower=50, p=im_compression_prob),
-            # geometric transforms
-            Ax.ResizeIfNeeded(max_size=imgsz),
-            A.HorizontalFlip(p=0.5),
-            A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
-            A.ShiftScaleRotate(
-                p=1, shift_limit=0.1, scale_limit=0.25, rotate_limit=20, border_mode=cv2.BORDER_CONSTANT
-            ),
-            # torch-related transforms
-            A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
-            ToTensorV2(p=1.0),
-        ]
-    LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))
-    return A.Compose(T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
+        # image transforms (16-bit compatible)
+        A16.Clip(p=1.0, lower_limit=(0.2, 0.25), upper_limit=(0.4, 0.45)),
+        A16.CLAHE(p=0.5, clip_limit=(3, 5), tile_grid_size=(0, 0)),
+        A16.NormalizeMinMax(p=1.0),
+        A.UnsharpMask(p=0.5, threshold=5),
+        A.ToRGB(p=1.0),
+        A.ImageCompression(quality_lower=50, p=im_compression_prob),
+        # geometric transforms
+        Ax.ResizeIfNeeded(max_size=imgsz),
+        A.HorizontalFlip(p=0.5),
+        A.PadIfNeeded(
+            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+        ),  # letterbox
+        A.ShiftScaleRotate(
+            p=1,
+            shift_limit=0.1,
+            scale_limit=0.25,
+            rotate_limit=20,
+            border_mode=cv2.BORDER_CONSTANT,
+        ),
+        # torch-related transforms
+        A.Normalize(
+            mean=0.0, std=1.0
+        ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+        ToTensorV2(p=1.0),
+    ]
+    LOGGER.info(
+        prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p)
+    )
+    return A.Compose(
+        T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False)
+    )
 
 
 def horizon_base_ir16bit(
@@ -136,16 +168,24 @@ def horizon_base_ir16bit(
     return A.Compose(
         [
             # image transforms (16-bit compatible)
-            A16.Clip(p=1.0, lower_limit=(lower_limit,) * 2, upper_limit=(upper_limit,) * 2),
-            A16.CLAHE(p=1.0 if clahe else 0.0, clip_limit=(4, 4), tile_grid_size=(0, 0)),
+            A16.Clip(
+                p=1.0, lower_limit=(lower_limit,) * 2, upper_limit=(upper_limit,) * 2
+            ),
+            A16.CLAHE(
+                p=1.0 if clahe else 0.0, clip_limit=(4, 4), tile_grid_size=(0, 0)
+            ),
             A16.NormalizeMinMax(p=1.0),
             A.UnsharpMask(p=1.0 if unsharp_mask else 0.0, threshold=5),
             A.ToRGB(p=1.0),
             # geometric transforms
             Ax.ResizeIfNeeded(max_size=imgsz),
-            A.PadIfNeeded(min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT),  # letterbox
+            A.PadIfNeeded(
+                min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT
+            ),  # letterbox
             # torch-related transforms
-            A.Normalize(mean=0.0, std=1.0),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+            A.Normalize(
+                mean=0.0, std=1.0
+            ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
             ToTensorV2(p=1.0),
         ],
         keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
