@@ -9,15 +9,49 @@ Useful links:
 - https://albumentations.ai/docs/getting_started/transforms_and_targets/
 """
 
-import albumentations as A
-import cv2
+from typing import List
 import numpy as np
+import cv2
+import albumentations as A
+from albumentations.core.transforms_interface import BasicTransform
 from albumentations.pytorch.transforms import ToTensorV2
 
 import utils.albumentations16 as A16
 import utils.albumextensions as Ax
 from utils.horizon import points_to_pitch_theta  # points_to_hough
 from utils.general import LOGGER, colorstr
+
+
+def log_transforms(transforms: List[BasicTransform], prefix: str) -> None:
+    """Log transforms."""
+    LOGGER.info(
+        f"{prefix} {', '.join(f'{x}'.replace('always_apply=False, ', '') for x in transforms if x.p)}"
+    )
+
+
+def geometric_augment(imgsz: int) -> List[BasicTransform]:
+    """
+    Geometric transforms for augmentation.
+    """
+    return [
+        A.RandomCropFromBorders(p=0.1),
+        Ax.ResizeIfNeeded(max_size=imgsz),
+        A.HorizontalFlip(p=0.5),
+        A.PadIfNeeded(
+            min_height=640, min_width=640, border_mode=cv2.BORDER_CONSTANT, value=0
+        ),
+        A.Affine(
+            p=0.75,
+            scale=(0.8, 1.1),
+            rotate=(-20, 20),
+            translate_percent=(-0.1, 0.1),
+            balanced_scale=True,
+            keep_ratio=True,
+            fit_output=False,
+            mode=cv2.BORDER_CONSTANT,
+            cval=0,
+        ),
+    ]
 
 
 def horizon_augment_rgb(
@@ -52,28 +86,12 @@ def horizon_augment_rgb(
         A.Blur(p=0.05),
         A.ImageCompression(quality_lower=75, p=im_compression_prob),
         # geometric transforms
-        Ax.ResizeIfNeeded(max_size=imgsz),
-        A.HorizontalFlip(p=0.5),
-        A.PadIfNeeded(
-            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT, value=0
-        ),  # letterbox
-        A.ShiftScaleRotate(
-            p=1,
-            shift_limit=0.1,
-            scale_limit=0.25,
-            rotate_limit=30,
-            border_mode=cv2.BORDER_CONSTANT,
-            value=0,
-        ),
+        *geometric_augment(imgsz),
         # torch-related transforms
-        A.Normalize(
-            mean=0.0, std=1.0
-        ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+        A.Normalize(mean=0.0, std=1.0),
         ToTensorV2(p=1.0),
     ]
-    LOGGER.info(
-        prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p)
-    )
+    log_transforms(T, prefix)
     return A.Compose(
         T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False)
     )
@@ -97,9 +115,7 @@ def horizon_base_rgb(imgsz: int) -> A.Compose:
                 value=0,
             ),  # letterbox
             # torch-related transforms
-            A.Normalize(
-                mean=0.0, std=1.0
-            ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+            A.Normalize(mean=0.0, std=1.0),
             ToTensorV2(p=1.0),
         ],
         keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
@@ -126,28 +142,12 @@ def horizon_augment_ir16bit(
         A.ToRGB(p=1.0),
         A.ImageCompression(quality_lower=50, p=im_compression_prob),
         # geometric transforms
-        Ax.ResizeIfNeeded(max_size=imgsz),
-        A.HorizontalFlip(p=0.5),
-        A.PadIfNeeded(
-            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT, value=0
-        ),  # letterbox
-        A.ShiftScaleRotate(
-            p=1,
-            shift_limit=0.1,
-            scale_limit=0.25,
-            rotate_limit=20,
-            border_mode=cv2.BORDER_CONSTANT,
-            value=0,
-        ),
+        *geometric_augment(imgsz),
         # torch-related transforms
-        A.Normalize(
-            mean=0.0, std=1.0
-        ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+        A.Normalize(mean=0.0, std=1.0),
         ToTensorV2(p=1.0),
     ]
-    LOGGER.info(
-        prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p)
-    )
+    log_transforms(T, prefix)
     return A.Compose(
         T, keypoint_params=A.KeypointParams(format="xy", remove_invisible=False)
     )
@@ -191,32 +191,25 @@ def horizon_base_ir16bit(
                 value=0,
             ),  # letterbox
             # torch-related transforms
-            A.Normalize(
-                mean=0.0, std=1.0
-            ),  # img = (img - mean * max_pixel_value) / (std * max_pixel_value)
+            A.Normalize(mean=0.0, std=1.0),
             ToTensorV2(p=1.0),
         ],
         keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
     )
 
 
-def points_to_normalised_pitch_theta(imgsz: int):
-    """Convert points to pitch, theta."""
+def points_to_normalised_pitch_theta(
+    points: np.ndarray,
+    image_w: int,
+    image_h: int,
+) -> np.ndarray:
+    """Convert points to normalised pitch and theta."""
+    # normalize points
+    points = np.array(points)
+    points[:, 0] /= image_w
+    points[:, 1] /= image_h
 
-    def _points_to_pitch_theta(
-        points: np.ndarray,
-        image_w: int = imgsz,
-        image_h: int = imgsz,
-    ) -> np.ndarray:
-        """Convert points to pitch, theta."""
-        # normalize points
-        points = np.array(points)
-        points[:, 0] /= image_w
-        points[:, 1] /= image_h
-
-        # convert to pitch, theta
-        x1, y1, x2, y2 = points.flatten()
-        pitch, theta = points_to_pitch_theta(x1, y1, x2, y2)
-        return np.array([pitch, theta])
-
-    return _points_to_pitch_theta
+    # convert to pitch, theta
+    x1, y1, x2, y2 = points.flatten()
+    pitch, theta = points_to_pitch_theta(x1, y1, x2, y2)
+    return np.array([pitch, theta])

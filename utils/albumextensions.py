@@ -55,13 +55,13 @@ class ResizeIfNeeded(DualTransform):
         # Bounding box coordinates are scale invariant
         return bbox
 
-    def apply_to_keypoint(self, keypoint: np.ndarray, max_size: int = 1024, **params) -> np.ndarray:
+    def apply_to_keypoints(self, keypoints: np.ndarray, max_size: int = 1024, **params) -> np.ndarray:
         height = params["rows"]
         width = params["cols"]
 
         scale = max_size / max([height, width])
         scale = min(1.0, scale)  # don't scale up
-        return F.keypoints_scale(keypoint, scale, scale)
+        return F.keypoints_scale(keypoints, scale, scale)
 
     def get_params(self) -> Dict[str, int]:
         return {"max_size": (self.max_size if isinstance(self.max_size, int) else random.choice(self.max_size))}

@@ -25,13 +25,14 @@ def get_train_rgb_dataloader(
     shuffle: bool = True,
     pin_memory: bool = False,
     dataloader_kwargs: dict = None,
-    im_compression_prob:float = 0.9,
+    im_compression_prob: float = 0.9,
 ):
     """Get training set dataloader for an RGB dataset."""
+
     dataset = HorizonDataset(
         dataset=dataset,
         transform=T.horizon_augment_rgb(imgsz, im_compression_prob),
-        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta,
     )
     return DataLoader(
         dataset,
@@ -53,10 +54,11 @@ def get_val_rgb_dataloader(
     dataloader_kwargs: dict = None,
 ):
     """Get validation set dataloader for an RGB dataset."""
+
     dataset = HorizonDataset(
         dataset=dataset,
         transform=T.horizon_base_rgb(imgsz),
-        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta,
     )
     return DataLoader(
         dataset,
@@ -79,10 +81,11 @@ def get_train_ir16bit_dataloader(
     im_compression_prob: float = 0.9,
 ):
     """Get training set dataloader for an ir16bit dataset."""
+
     dataset = HorizonDataset(
         dataset=dataset,
         transform=T.horizon_augment_ir16bit(imgsz, im_compression_prob),
-        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta,
         replace_8bit_path=True,
     )
     return DataLoader(
@@ -105,10 +108,11 @@ def get_val_ir16bit_dataloader(
     dataloader_kwargs: dict = None,
 ):
     """Get validation set dataloader for an ir16bit dataset."""
+
     dataset = HorizonDataset(
         dataset=dataset,
         transform=T.horizon_base_ir16bit(imgsz),
-        target_transform=T.points_to_normalised_pitch_theta(imgsz),
+        target_transform=T.points_to_normalised_pitch_theta,
         replace_8bit_path=True,
     )
     return DataLoader(
@@ -203,7 +207,11 @@ class HorizonDataset(Dataset):
         target = self.targets[idx]
 
         if self.replace_8bit_path:
-            fpath = fpath.replace("8Bit", "16Bit").replace(".jpg", ".png").replace("jpeg", "png")
+            fpath = (
+                fpath.replace("8Bit", "16Bit")
+                .replace(".jpg", ".png")
+                .replace("jpeg", "png")
+            )
 
         # read image (np.ndarray)
         image = cv2.imread(fpath, cv2.IMREAD_UNCHANGED)
