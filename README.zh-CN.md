@@ -1,6 +1,6 @@
 <div align="center">
   <p>
-    <a href="https://ultralytics.com/events/yolovision" target="_blank">
+    <a href="https://www.ultralytics.com/events/yolovision" target="_blank">
       <img width="100%" src="https://raw.githubusercontent.com/ultralytics/assets/main/yolov8/banner-yolov8.png"></a>
   </p>
 
@@ -10,7 +10,7 @@
     <a href="https://github.com/ultralytics/yolov5/actions/workflows/ci-testing.yml"><img src="https://github.com/ultralytics/yolov5/actions/workflows/ci-testing.yml/badge.svg" alt="YOLOv5 CI"></a>
     <a href="https://zenodo.org/badge/latestdoi/264818686"><img src="https://zenodo.org/badge/264818686.svg" alt="YOLOv5 Citation"></a>
     <a href="https://hub.docker.com/r/ultralytics/yolov5"><img src="https://img.shields.io/docker/pulls/ultralytics/yolov5?logo=docker" alt="Docker Pulls"></a>
-    <a href="https://ultralytics.com/discord"><img alt="Discord" src="https://img.shields.io/discord/1089800235347353640?logo=discord&logoColor=white&label=Discord&color=blue"></a> <a href="https://community.ultralytics.com"><img alt="Ultralytics Forums" src="https://img.shields.io/discourse/users?server=https%3A%2F%2Fcommunity.ultralytics.com&logo=discourse&label=Forums&color=blue"></a> <a href="https://reddit.com/r/ultralytics"><img alt="Ultralytics Reddit" src="https://img.shields.io/reddit/subreddit-subscribers/ultralytics?style=flat&logo=reddit&logoColor=white&label=Reddit&color=blue"></a>
+    <a href="https://discord.com/invite/ultralytics"><img alt="Discord" src="https://img.shields.io/discord/1089800235347353640?logo=discord&logoColor=white&label=Discord&color=blue"></a> <a href="https://community.ultralytics.com/"><img alt="Ultralytics Forums" src="https://img.shields.io/discourse/users?server=https%3A%2F%2Fcommunity.ultralytics.com&logo=discourse&label=Forums&color=blue"></a> <a href="https://reddit.com/r/ultralytics"><img alt="Ultralytics Reddit" src="https://img.shields.io/reddit/subreddit-subscribers/ultralytics?style=flat&logo=reddit&logoColor=white&label=Reddit&color=blue"></a>
     <br>
     <a href="https://bit.ly/yolov5-paperspace-notebook"><img src="https://assets.paperspace.io/img/gradient-badge.svg" alt="Run on Gradient"></a>
     <a href="https://colab.research.google.com/github/ultralytics/yolov5/blob/master/tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
@@ -18,9 +18,9 @@
   </div>
   <br>
 
-YOLOv5 🚀 是世界上最受欢迎的视觉 AI，代表<a href="https://ultralytics.com"> Ultralytics </a>对未来视觉 AI 方法的开源研究，结合在数千小时的研究和开发中积累的经验教训和最佳实践。
+YOLOv5 🚀 是世界上最受欢迎的视觉 AI，代表<a href="https://www.ultralytics.com/"> Ultralytics </a>对未来视觉 AI 方法的开源研究，结合在数千小时的研究和开发中积累的经验教训和最佳实践。
 
-我们希望这里的资源能帮助您充分利用 YOLOv5。请浏览 YOLOv5 <a href="https://docs.ultralytics.com/yolov5/">文档</a> 了解详细信息，在 <a href="https://github.com/ultralytics/yolov5/issues/new/choose">GitHub</a> 上提交问题以获得支持，并加入我们的 <a href="https://ultralytics.com/discord">Discord</a> 社区进行问题和讨论！
+我们希望这里的资源能帮助您充分利用 YOLOv5。请浏览 YOLOv5 <a href="https://docs.ultralytics.com/yolov5/">文档</a> 了解详细信息，在 <a href="https://github.com/ultralytics/yolov5/issues/new/choose">GitHub</a> 上提交问题以获得支持，并加入我们的 <a href="https://discord.com/invite/ultralytics">Discord</a> 社区进行问题和讨论！
 
 如需申请企业许可，请在 [Ultralytics Licensing](https://www.ultralytics.com/license) 处填写表格
 
@@ -37,7 +37,7 @@ YOLOv5 🚀 是世界上最受欢迎的视觉 AI，代表<a href="https://ultral
   <img src="https://github.com/ultralytics/assets/raw/main/social/logo-transparent.png" width="2%">
   <a href="https://ultralytics.com/bilibili"><img src="https://github.com/ultralytics/assets/raw/main/social/logo-social-bilibili.png" width="2%" alt="Ultralytics BiliBili"></a>
   <img src="https://github.com/ultralytics/assets/raw/main/social/logo-transparent.png" width="2%">
-  <a href="https://ultralytics.com/discord"><img src="https://github.com/ultralytics/assets/raw/main/social/logo-social-discord.png" width="2%" alt="Ultralytics Discord"></a>
+  <a href="https://discord.com/invite/ultralytics"><img src="https://github.com/ultralytics/assets/raw/main/social/logo-social-discord.png" width="2%" alt="Ultralytics Discord"></a>
 </div>
 </div>
 
@@ -45,7 +45,7 @@ YOLOv5 🚀 是世界上最受欢迎的视觉 AI，代表<a href="https://ultral
 
 我们很高兴宣布 Ultralytics YOLOv8 🚀 的发布，这是我们新推出的领先水平、最先进的（SOTA）模型，发布于 **[https://github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)**。 YOLOv8 旨在快速、准确且易于使用，使其成为广泛的物体检测、图像分割和图像分类任务的极佳选择。
 
-请查看 [YOLOv8 文档](https://docs.ultralytics.com)了解详细信息，并开始使用：
+请查看 [YOLOv8 文档](https://docs.ultralytics.com/)了解详细信息，并开始使用：
 
 [![PyPI 版本](https://badge.fury.io/py/ultralytics.svg)](https://badge.fury.io/py/ultralytics) [![下载量](https://static.pepy.tech/badge/ultralytics)](https://pepy.tech/project/ultralytics)
 
@@ -54,7 +54,7 @@ pip install ultralytics
 ```
 
 <div align="center">
-  <a href="https://ultralytics.com/yolo" target="_blank">
+  <a href="https://www.ultralytics.com/yolo" target="_blank">
   <img width="100%" src="https://raw.githubusercontent.com/ultralytics/assets/main/yolov8/yolo-comparison-plots.png"></a>
 </div>
 
@@ -78,7 +78,7 @@ pip install -r requirements.txt  # install
 <details>
 <summary>推理</summary>
 
-使用 YOLOv5 [PyTorch Hub](https://docs.ultralytics.com/yolov5/tutorials/pytorch_hub_model_loading) 推理。最新 [模型](https://github.com/ultralytics/yolov5/tree/master/models) 将自动的从 YOLOv5 [release](https://github.com/ultralytics/yolov5/releases) 中下载。
+使用 YOLOv5 [PyTorch Hub](https://docs.ultralytics.com/yolov5/tutorials/pytorch_hub_model_loading/) 推理。最新 [模型](https://github.com/ultralytics/yolov5/tree/master/models) 将自动的从 YOLOv5 [release](https://github.com/ultralytics/yolov5/releases) 中下载。
 
 ```python
 import torch
@@ -122,7 +122,7 @@ python detect.py --weights yolov5s.pt --source 0                               #
 <summary>训练</summary>
 
 下面的命令重现 YOLOv5 在 [COCO](https://github.com/ultralytics/yolov5/blob/master/data/scripts/get_coco.sh) 数据集上的结果。 最新的 [模型](https://github.com/ultralytics/yolov5/tree/master/models) 和 [数据集](https://github.com/ultralytics/yolov5/tree/master/data)
-将自动的从 YOLOv5 [release](https://github.com/ultralytics/yolov5/releases) 中下载。 YOLOv5n/s/m/l/x 在 V100 GPU 的训练时间为 1/2/4/6/8 天（ [多GPU](https://docs.ultralytics.com/yolov5/tutorials/multi_gpu_training) 训练速度更快）。 尽可能使用更大的 `--batch-size` ，或通过 `--batch-size -1` 实现 YOLOv5 [自动批处理](https://github.com/ultralytics/yolov5/pull/5092) 。下方显示的 batchsize 适用于 V100-16GB。
+将自动的从 YOLOv5 [release](https://github.com/ultralytics/yolov5/releases) 中下载。 YOLOv5n/s/m/l/x 在 V100 GPU 的训练时间为 1/2/4/6/8 天（ [多GPU](https://docs.ultralytics.com/yolov5/tutorials/multi_gpu_training/) 训练速度更快）。 尽可能使用更大的 `--batch-size` ，或通过 `--batch-size -1` 实现 YOLOv5 [自动批处理](https://github.com/ultralytics/yolov5/pull/5092) 。下方显示的 batchsize 适用于 V100-16GB。
 
 ```bash
 python train.py --data coco.yaml --epochs 300 --weights '' --cfg yolov5n.yaml  --batch-size 128
@@ -139,29 +139,29 @@ python train.py --data coco.yaml --epochs 300 --weights '' --cfg yolov5n.yaml  -
 <details open>
 <summary>教程</summary>
 
-- [训练自定义数据](https://docs.ultralytics.com/yolov5/tutorials/train_custom_data) 🚀 推荐
+- [训练自定义数据](https://docs.ultralytics.com/yolov5/tutorials/train_custom_data/) 🚀 推荐
 - [获得最佳训练结果的技巧](https://docs.ultralytics.com/guides/model-training-tips/) ☘️
-- [多GPU训练](https://docs.ultralytics.com/yolov5/tutorials/multi_gpu_training)
-- [PyTorch Hub](https://docs.ultralytics.com/yolov5/tutorials/pytorch_hub_model_loading) 🌟 新
-- [TFLite，ONNX，CoreML，TensorRT导出](https://docs.ultralytics.com/yolov5/tutorials/model_export) 🚀
-- [NVIDIA Jetson平台部署](https://docs.ultralytics.com/yolov5/tutorials/running_on_jetson_nano) 🌟 新
-- [测试时增强 (TTA)](https://docs.ultralytics.com/yolov5/tutorials/test_time_augmentation)
-- [模型集成](https://docs.ultralytics.com/yolov5/tutorials/model_ensembling)
-- [模型剪枝/稀疏](https://docs.ultralytics.com/yolov5/tutorials/model_pruning_and_sparsity)
-- [超参数进化](https://docs.ultralytics.com/yolov5/tutorials/hyperparameter_evolution)
-- [冻结层的迁移学习](https://docs.ultralytics.com/yolov5/tutorials/transfer_learning_with_frozen_layers)
-- [架构概述](https://docs.ultralytics.com/yolov5/tutorials/architecture_description) 🌟 新
-- [Roboflow用于数据集、标注和主动学习](https://docs.ultralytics.com/yolov5/tutorials/roboflow_datasets_integration)
-- [ClearML日志记录](https://docs.ultralytics.com/yolov5/tutorials/clearml_logging_integration) 🌟 新
-- [使用Neural Magic的Deepsparse的YOLOv5](https://docs.ultralytics.com/yolov5/tutorials/neural_magic_pruning_quantization) 🌟 新
-- [Comet日志记录](https://docs.ultralytics.com/yolov5/tutorials/comet_logging_integration) 🌟 新
+- [多GPU训练](https://docs.ultralytics.com/yolov5/tutorials/multi_gpu_training/)
+- [PyTorch Hub](https://docs.ultralytics.com/yolov5/tutorials/pytorch_hub_model_loading/) 🌟 新
+- [TFLite，ONNX，CoreML，TensorRT导出](https://docs.ultralytics.com/yolov5/tutorials/model_export/) 🚀
+- [NVIDIA Jetson平台部署](https://docs.ultralytics.com/yolov5/tutorials/running_on_jetson_nano/) 🌟 新
+- [测试时增强 (TTA)](https://docs.ultralytics.com/yolov5/tutorials/test_time_augmentation/)
+- [模型集成](https://docs.ultralytics.com/yolov5/tutorials/model_ensembling/)
+- [模型剪枝/稀疏](https://docs.ultralytics.com/yolov5/tutorials/model_pruning_and_sparsity/)
+- [超参数进化](https://docs.ultralytics.com/yolov5/tutorials/hyperparameter_evolution/)
+- [冻结层的迁移学习](https://docs.ultralytics.com/yolov5/tutorials/transfer_learning_with_frozen_layers/)
+- [架构概述](https://docs.ultralytics.com/yolov5/tutorials/architecture_description/) 🌟 新
+- [Roboflow用于数据集、标注和主动学习](https://docs.ultralytics.com/yolov5/tutorials/roboflow_datasets_integration/)
+- [ClearML日志记录](https://docs.ultralytics.com/yolov5/tutorials/clearml_logging_integration/) 🌟 新
+- [使用Neural Magic的Deepsparse的YOLOv5](https://docs.ultralytics.com/yolov5/tutorials/neural_magic_pruning_quantization/) 🌟 新
+- [Comet日志记录](https://docs.ultralytics.com/yolov5/tutorials/comet_logging_integration/) 🌟 新
 
 </details>
 
 ## <div align="center">模块集成</div>
 
 <br>
-<a align="center" href="https://ultralytics.com/hub" target="_blank">
+<a align="center" href="https://www.ultralytics.com/hub" target="_blank">
 <img width="100%" src="https://github.com/ultralytics/assets/raw/main/im/integrations-loop.png"></a>
 <br>
 <br>
@@ -170,7 +170,7 @@ python train.py --data coco.yaml --epochs 300 --weights '' --cfg yolov5n.yaml  -
   <a href="https://roboflow.com/?ref=ultralytics">
     <img src="https://github.com/ultralytics/assets/raw/main/partners/logo-roboflow.png" width="10%" /></a>
   <img src="https://github.com/ultralytics/assets/raw/main/social/logo-transparent.png" width="15%" height="0" alt="" />
-  <a href="https://cutt.ly/yolov5-readme-clearml">
+  <a href="https://clear.ml/?utm_source=yolov5&utm_medium=referral&utm_campaign=yolov5_repo_readme">
     <img src="https://github.com/ultralytics/assets/raw/main/partners/logo-clearml.png" width="10%" /></a>
   <img src="https://github.com/ultralytics/assets/raw/main/social/logo-transparent.png" width="15%" height="0" alt="" />
   <a href="https://bit.ly/yolov5-readme-comet2">
@@ -188,7 +188,7 @@ python train.py --data coco.yaml --epochs 300 --weights '' --cfg yolov5n.yaml  -
 
 [Ultralytics HUB](https://www.ultralytics.com/hub) 是我们的⭐**新的**用于可视化数据集、训练 YOLOv5 🚀 模型并以无缝体验部署到现实世界的无代码解决方案。现在开始 **免费** 使用他！
 
-<a align="center" href="https://ultralytics.com/hub" target="_blank">
+<a align="center" href="https://www.ultralytics.com/hub" target="_blank">
 <img width="100%" src="https://github.com/ultralytics/assets/raw/main/im/ultralytics-hub.png"></a>
 
 ## <div align="center">为什么选择 YOLOv5</div>
@@ -233,7 +233,7 @@ YOLOv5 超级容易上手，简单易学。我们优先考虑现实世界的结�
 - 所有模型都使用默认配置，训练 300 epochs。n和s模型使用 [hyp.scratch-low.yaml](https://github.com/ultralytics/yolov5/blob/master/data/hyps/hyp.scratch-low.yaml) ，其他模型都使用 [hyp.scratch-high.yaml](https://github.com/ultralytics/yolov5/blob/master/data/hyps/hyp.scratch-high.yaml) 。
 - \*\*mAP<sup>val</sup>\*\*在单模型单尺度上计算，数据集使用 [COCO val2017](http://cocodataset.org) 。<br>复现命令 `python val.py --data coco.yaml --img 640 --conf 0.001 --iou 0.65`
 - **推理速度**在 COCO val 图像总体时间上进行平均得到，测试环境使用[AWS p3.2xlarge](https://aws.amazon.com/ec2/instance-types/p3/)实例。 NMS 时间 (大约 1 ms/img) 不包括在内。<br>复现命令 `python val.py --data coco.yaml --img 640 --task speed --batch 1`
-- **TTA** [测试时数据增强](https://docs.ultralytics.com/yolov5/tutorials/test_time_augmentation) 包括反射和尺度变换。<br>复现命令 `python val.py --data coco.yaml --img 1536 --iou 0.7 --augment`
+- **TTA** [测试时数据增强](https://docs.ultralytics.com/yolov5/tutorials/test_time_augmentation/) 包括反射和尺度变换。<br>复现命令 `python val.py --data coco.yaml --img 1536 --iou 0.7 --augment`
 
 </details>
 
@@ -247,7 +247,7 @@ YOLOv5 超级容易上手，简单易学。我们优先考虑现实世界的结�
 <br>
 
 <div align="center">
-<a align="center" href="https://ultralytics.com/yolov5" target="_blank">
+<a align="center" href="https://www.ultralytics.com/yolo" target="_blank">
 <img width="800" src="https://user-images.githubusercontent.com/61612323/204180385-84f3aca9-a5e9-43d8-a617-dda7ca12e54a.png"></a>
 </div>
 
@@ -462,7 +462,7 @@ Ultralytics 提供两种许可证选项以适应各种使用场景：
   <img src="https://github.com/ultralytics/assets/raw/main/social/logo-transparent.png" width="3%">
   <a href="https://ultralytics.com/bilibili"><img src="https://github.com/ultralytics/assets/raw/main/social/logo-social-bilibili.png" width="3%" alt="Ultralytics BiliBili"></a>
   <img src="https://github.com/ultralytics/assets/raw/main/social/logo-transparent.png" width="3%">
-  <a href="https://ultralytics.com/discord"><img src="https://github.com/ultralytics/assets/raw/main/social/logo-social-discord.png" width="3%" alt="Ultralytics Discord"></a>
+  <a href="https://discord.com/invite/ultralytics"><img src="https://github.com/ultralytics/assets/raw/main/social/logo-social-discord.png" width="3%" alt="Ultralytics Discord"></a>
 </div>
 
 [tta]: https://docs.ultralytics.com/yolov5/tutorials/test_time_augmentation
