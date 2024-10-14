@@ -18,6 +18,8 @@ Example usage:
         --half \
         --fuse \
         --fname dan.engine
+
+For ONNX only, simple specify --fname model_name.onnx
 """
 
 import argparse
