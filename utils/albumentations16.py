@@ -15,6 +15,7 @@ from albumentations.core.pydantic import (
     ZeroOneRangeType,
 )
 
+
 def convert_16bit_to_8bit(im, augment=True):
     if len(im.shape) == 3 and im.shape[2] == 3:
         # for some reason, some 16bit images have 3 channels
@@ -97,6 +98,7 @@ class CLAHE(ImageOnlyTransform):
         return {"clip_limit": random.uniform(self.clip_limit[0], self.clip_limit[1])}
 
     def get_transform_init_args_names(self):
+        """Returns names of arguments that are used in __init__ method of the transform."""
         return ("clip_limit", "tile_grid_size")
 
 
@@ -116,6 +118,10 @@ class NormalizeMinMax(ImageOnlyTransform):
 
     def apply(self, img, **params):
         return cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+
+    def get_transform_init_args_names(self):
+        """Returns names of arguments that are used in __init__ method of the transform."""
+        return ()
 
 
 class Clip(ImageOnlyTransform):
@@ -161,3 +167,7 @@ class Clip(ImageOnlyTransform):
             "lower_limit": random.uniform(self.lower_limit[0], self.lower_limit[1]),
             "upper_limit": random.uniform(self.upper_limit[0], self.upper_limit[1]),
         }
+
+    def get_transform_init_args_names(self):
+        """Returns names of arguments that are used in __init__ method of the transform."""
+        return ("lower_limit", "upper_limit")

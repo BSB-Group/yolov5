@@ -54,6 +54,7 @@ def get_dataloaders(
     train_tag: str,
     val_tag: str,
     imgsz: int,
+    im_compression_prob: float,
     field: str = "ground_truth_pl.polylines.closed",
 ):
     # TODO: add tag check
@@ -65,6 +66,7 @@ def get_dataloaders(
             ),
             imgsz=imgsz,
             batch_size=64 if imgsz == 640 else 16,
+            im_compression_prob = im_compression_prob,
         )
 
         val_dataloader = get_val_rgb_dataloader(
@@ -82,6 +84,7 @@ def get_dataloaders(
                 # .take(1000, seed=51)
             ),
             imgsz=imgsz,
+            im_compression_prob = im_compression_prob,
         )
 
         val_dataloader = get_val_ir16bit_dataloader(
@@ -263,6 +266,7 @@ def run(
     imgsz: int = 640,  # model input size (assumes squared input)
     epochs: int = 100,
     dropout: float = 0.25,  # dropout rate for classification heads
+    im_compression_prob: float = 0.9,
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
 ):
     # create dir to store checkpoints
@@ -286,7 +290,7 @@ def run(
     LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
 
     # load dataloaders
-    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz)
+    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz, im_compression_prob)
     LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
 
     optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
@@ -323,6 +327,7 @@ def run(
             "epochs": epochs,
             "dropout": dropout,
             "device": device,
+            "im_compression_prob": im_compression_prob,
         },
     )
 
@@ -504,6 +509,7 @@ def parse_args():
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
+    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
     parser.add_argument(
         "--device",
         default="cuda" if torch.cuda.is_available() else "cpu",
