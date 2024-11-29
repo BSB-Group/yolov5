@@ -140,7 +140,7 @@ def train(hyp, opt, device, callbacks):
         opt.batch_size,
         opt.weights,
         opt.single_cls,
-        opt.single_cls_val
+        opt.single_cls_val,
         opt.evolve,
         opt.data,
         opt.cfg,
@@ -684,6 +684,7 @@ def main(opt, callbacks=Callbacks()):
 
     # DDP mode
     device = select_device(opt.device, batch_size=opt.batch_size)
+    
     if opt.single_cls_val:
         opt.image_weights = False
         LOGGER.warning(
