@@ -685,11 +685,11 @@ def main(opt, callbacks=Callbacks()):
     # DDP mode
     device = select_device(opt.device, batch_size=opt.batch_size)
     
-    if opt.single_cls_val:
-        opt.image_weights = False
-        LOGGER.warning(
-            "WARNING single_cls_val=True is not compatible with image-weights=True, disabling image-weights"
-        )
+    if opt.single_cls_val and opt.image_weights:
+        raise NotImplementedError(
+                                  "--image-weights and --single-cls-val are incompatible with each other."
+                                  "image weighting need to results from multi-class validation to weight the images"
+                                  )
 
     if LOCAL_RANK != -1:
         msg = "is not compatible with YOLOv5 Multi-GPU DDP training"
@@ -966,6 +966,7 @@ def run(**kwargs):
         device (str, optional): CUDA device identifier, e.g., '0', '0,1,2,3', or 'cpu'. Defaults to an empty string.
         multi_scale (bool, optional): Use multi-scale training, varying image size by ±50%. Defaults to False.
         single_cls (bool, optional): Train with multi-class data as single-class. Defaults to False.
+        single-cls-val (bool, optional): Validate with multi-class data as single-class. Defaults to False. Not compatible with image_weights.
         optimizer (str, optional): Optimizer type, choices are ['SGD', 'Adam', 'AdamW']. Defaults to 'SGD'.
         sync_bn (bool, optional): Use synchronized BatchNorm, only available in DDP mode. Defaults to False.
         workers (int, optional): Maximum dataloader workers per rank in DDP mode. Defaults to 8.
