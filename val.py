@@ -330,6 +330,8 @@ def run(
     seen = 0
     confusion_matrix = ConfusionMatrix(nc=nc)
     names = model.names if hasattr(model, "names") else model.module.names  # get class names
+    if single_cls:
+        names = {0: "item"}
     if isinstance(names, (list, tuple)):  # old format
         names = dict(enumerate(names))
     class_map = coco80_to_coco91_class() if is_coco else list(range(1000))
