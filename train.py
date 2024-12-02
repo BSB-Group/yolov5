@@ -688,7 +688,7 @@ def main(opt, callbacks=Callbacks()):
     if opt.single_cls_val and opt.image_weights:
         raise NotImplementedError(
                                   "--image-weights and --single-cls-val are incompatible with each other."
-                                  "image weighting need to results from multi-class validatino to weight the images"
+                                  "image weighting need to results from multi-class validation to weight the images"
                                   )
 
     if LOCAL_RANK != -1:
