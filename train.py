@@ -134,12 +134,13 @@ def train(hyp, opt, device, callbacks):
         - Datasets: https://github.com/ultralytics/yolov5/tree/master/data
         - Tutorial: https://docs.ultralytics.com/yolov5/tutorials/train_custom_data
     """
-    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze, im_compression_prob = (
+    save_dir, epochs, batch_size, weights, single_cls, single_cls_val, evolve, data, cfg, resume, noval, nosave, workers, freeze, im_compression_prob = (
         Path(opt.save_dir),
         opt.epochs,
         opt.batch_size,
         opt.weights,
         opt.single_cls,
+        opt.single_cls_val,
         opt.evolve,
         opt.data,
         opt.cfg,
@@ -314,7 +315,7 @@ def train(hyp, opt, device, callbacks):
             imgsz,
             batch_size // WORLD_SIZE * 2,
             gs,
-            single_cls,
+            single_cls_val,
             hyp=hyp,
             cache=None if noval else opt.cache,
             rect=True,
@@ -466,7 +467,7 @@ def train(hyp, opt, device, callbacks):
                     imgsz=imgsz,
                     half=amp,
                     model=ema.ema,
-                    single_cls=single_cls,
+                    single_cls=single_cls_val,
                     dataloader=val_loader,
                     save_dir=save_dir,
                     plots=False,
@@ -529,7 +530,7 @@ def train(hyp, opt, device, callbacks):
                         imgsz=imgsz,
                         model=attempt_load(f, device).half(),
                         iou_thres=0.65 if is_coco else 0.60,  # best pycocotools at iou 0.65
-                        single_cls=single_cls,
+                        single_cls=single_cls_val,
                         dataloader=val_loader,
                         save_dir=save_dir,
                         save_json=is_coco,
@@ -594,6 +595,7 @@ def parse_opt(known=False):
     parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu")
     parser.add_argument("--multi-scale", action="store_true", help="vary img-size +/- 50%%")
     parser.add_argument("--single-cls", action="store_true", help="train multi-class data as single-class")
+    parser.add_argument("--single-cls-val", action="store_true", help="validate multi-class data as single-class")
     parser.add_argument("--optimizer", type=str, choices=["SGD", "Adam", "AdamW"], default="SGD", help="optimizer")
     parser.add_argument("--sync-bn", action="store_true", help="use SyncBatchNorm, only available in DDP mode")
     parser.add_argument("--workers", type=int, default=8, help="max dataloader workers (per RANK in DDP mode)")
@@ -682,6 +684,13 @@ def main(opt, callbacks=Callbacks()):
 
     # DDP mode
     device = select_device(opt.device, batch_size=opt.batch_size)
+    
+    if opt.single_cls_val and opt.image_weights:
+        raise NotImplementedError(
+                                  "--image-weights and --single-cls-val are incompatible with each other."
+                                  "image weighting need to results from multi-class validation to weight the images"
+                                  )
+
     if LOCAL_RANK != -1:
         msg = "is not compatible with YOLOv5 Multi-GPU DDP training"
         assert not opt.image_weights, f"--image-weights {msg}"
@@ -957,6 +966,7 @@ def run(**kwargs):
         device (str, optional): CUDA device identifier, e.g., '0', '0,1,2,3', or 'cpu'. Defaults to an empty string.
         multi_scale (bool, optional): Use multi-scale training, varying image size by ±50%. Defaults to False.
         single_cls (bool, optional): Train with multi-class data as single-class. Defaults to False.
+        single-cls-val (bool, optional): Validate with multi-class data as single-class. Defaults to False. Not compatible with image_weights.
         optimizer (str, optional): Optimizer type, choices are ['SGD', 'Adam', 'AdamW']. Defaults to 'SGD'.
         sync_bn (bool, optional): Use synchronized BatchNorm, only available in DDP mode. Defaults to False.
         workers (int, optional): Maximum dataloader workers per rank in DDP mode. Defaults to 8.
