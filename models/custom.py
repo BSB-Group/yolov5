@@ -4,6 +4,7 @@ from typing import Union
 import numpy as np
 import torch
 from torch import nn
+from torchvision.ops import nms
 
 from models.common import Classify, DetectMultiBackend
 from models.experimental import attempt_load
@@ -266,6 +267,9 @@ class AHOY(nn.Module):
         fp16: bool = False,
         fuse: bool = True,  # fuse conv and bn layers
         inplace: bool = True,  # inplace modification of models
+        nms: bool = False,
+        conf_thr = 0.05
+        nms_thr = 0.45
     ):
         super().__init__()
         self.obj_det = ObjectsModel(obj_det_weigths, device=device, fp16=fp16, fuse=fuse)
@@ -274,6 +278,9 @@ class AHOY(nn.Module):
         self.fp16 = fp16
         self.stride = self.obj_det.stride
         self.names = self.obj_det.names
+        self.nms = nms
+        self.conf_thr = conf_thr
+        self.nms_thr = nms_thr
 
         # keep track of hooks
         self.hooks = {}
@@ -324,27 +331,75 @@ class AHOY(nn.Module):
 
     @staticmethod
     def _postprocessing_hook(module, inputs, outputs):
-        """Convert outputs to float if model is not in fp16."""
+        """Convert outputs to float and apply NMS on all elements of the batch."""
+
         if not module.fp16:
             return outputs
         # ahoy outputs: (tuple(Tensor, ...), Tensor, Tensor)
         first_tuple, second_item, third_item = outputs
 
-        # Convert the first item of the first tuple to float
-        converted_first_item = first_tuple[0].float()
-
-        # Reconstruct the first tuple if there are more items in it
-        if len(first_tuple) > 1:
-            new_first_tuple = (converted_first_item,) + first_tuple[1:]
+        #do nms in graph
+        if module.nms:
+            new_first_tuple = nms(first_tuple[0], module.conf_thr, module.nms_thr)
+        
         else:
-            new_first_tuple = (converted_first_item,)
+            # Convert the first item of the first tuple to float
+            converted_first_item = first_tuple[0].float()
+
+            # Reconstruct the first tuple if there are more items in it
+            if len(first_tuple) > 1:
+                new_first_tuple = (converted_first_item,) + first_tuple[1:]
+            else:
+                new_first_tuple = (converted_first_item,)
 
         second_item = second_item.softmax(-1)  # batch dim
         third_item = third_item.softmax(-1)  # batch dim
 
-        # Reconstruct the overall output
+            # Reconstruct the overall output
         return (new_first_tuple, second_item.float(), third_item.float())
 
+def nms(x, score_thres=0.05, iou_thres=0.45):
+    
+    #get batch size
+    batch_size = x.shape[0]
+
+    # Process each batch element
+    nms_results = torch.zeros((batch_size, 1000, x.shape[2]+1), dtype=x.dtype)
+
+    for b in range(batch_size):
+        batch_boxes = xywh2xyxy(x[b, :, :4])  # Convert boxes to x1y1x2y2
+        batch_scores = x[b, :, 4]
+        batch_classes = x[b, :, 5:]
+        
+        #filter by score
+        idx = batch_scores > score_thres
+        batch_boxes = batch_boxes[idx]
+        batch_scores = batch_scores[idx]
+        batch_classes = batch_classes[idx]
+
+        #do nms
+        keep_indices = nms(batch_boxes, batch_scores, 0.1)  # Perform NMS
+
+        #filter nms results and reconcatenate
+        batch_keep_boxes = batch_boxes[keep_indices]
+        batch_keep_scores = batch_scores[keep_indices]
+        batch_keep_classes = batch_classes[keep_indices]
+        batch_keep = torch.cat((batch_keep_boxes, batch_keep_scores.unsqueeze(1), batch_keep_classes), 1)
+
+        #fill nms results with one hot for valid boxes
+        nms_results[b,:batch_keep.shape[0],1:] = batch_keep
+        nms_results[b,:batch_keep.shape[0],0] = torch.ones(batch_keep.shape[0], dtype=x.dtype)
+
+    return nms_results
+
+def xywh2xyxy(x):
+    """Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right."""
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[..., 0] = x[..., 0] - x[..., 2] / 2  # top left x
+    y[..., 1] = x[..., 1] - x[..., 3] / 2  # top left y
+    y[..., 2] = x[..., 0] + x[..., 2] / 2  # bottom right x
+    y[..., 3] = x[..., 1] + x[..., 3] / 2  # bottom right y
+    return y
 
 class DAN(nn.Module):
     """
