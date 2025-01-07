@@ -359,6 +359,13 @@ class AHOY(nn.Module):
         return (new_first_tuple, second_item.float(), third_item.float())
 
 def graph_nms(x, score_thres=0.05, iou_thres=0.45):
+    """Do nms in graph, with one hot output vector for valid boxes.
+    Output shape is (b,1000,1+4+1+NC)
+    Where:
+        b = batch size
+        1000 = max number of boxes to keep
+        1+4+1+NC = 1 for valid box + 4 for box coords + 1 for objectness + NC for number of classes
+    """
     
     #get batch size
     batch_size = x.shape[0]
@@ -384,7 +391,7 @@ def graph_nms(x, score_thres=0.05, iou_thres=0.45):
         batch_keep_boxes = batch_boxes[keep_indices]
         batch_keep_scores = batch_scores[keep_indices]
         batch_keep_classes = batch_classes[keep_indices]
-        batch_keep = torch.cat((batch_keep_boxes, batch_keep_scores.unsqueeze(1), batch_keep_classes), 1)
+        batch_keep = torch.cat((batch_keep_boxes, batch_keep_scores.unsqueeze(1), batch_keep_classes), 1)[:1000]
 
         #fill nms results with one hot for valid boxes
         nms_results[b,:batch_keep.shape[0],1:] = batch_keep
