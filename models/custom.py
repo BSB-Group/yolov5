@@ -359,7 +359,8 @@ class AHOY(nn.Module):
         return (new_first_tuple, second_item.float(), third_item.float())
 
 def graph_nms(x, score_thres=0.05, iou_thres=0.45):
-    """Do nms in graph, with one hot output vector for valid boxes.
+    """
+    Do nms in graph, with one hot output vector for valid boxes.
     Output shape is (b,1000,1+4+1+NC)
     Where:
         b = batch size
@@ -374,17 +375,16 @@ def graph_nms(x, score_thres=0.05, iou_thres=0.45):
     nms_results = torch.zeros((batch_size, 1000, x.shape[2]+1), dtype=x.dtype)
 
     for b in range(batch_size):
-        batch_boxes = xywh2xyxy(x[b, :, :4])  # Convert boxes to x1y1x2y2
-        batch_scores = x[b, :, 4]
-        batch_classes = x[b, :, 5:]
+        batch_tensor = x[b]
         
-        #filter by score
-        idx = batch_scores > score_thres
-        batch_boxes = batch_boxes[idx]
-        batch_scores = batch_scores[idx]
-        batch_classes = batch_classes[idx]
+        #filter by confidence
+        idx = batch_tensor[:, 4] > score_thres
+        batch_tensor = batch_tensor[idx]
 
         #do nms
+        batch_boxes = xywh2xyxy(batch_tensor[:, :4])  # Convert boxes to x1y1x2y2
+        batch_scores = batch_tensor[:, 4] 
+        batch_classes = batch_tensor[:, 5:]
         keep_indices = nms(batch_boxes, batch_scores, iou_thres)  # Perform NMS
 
         #filter nms results and reconcatenate
