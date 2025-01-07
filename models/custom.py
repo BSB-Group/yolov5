@@ -268,8 +268,8 @@ class AHOY(nn.Module):
         fuse: bool = True,  # fuse conv and bn layers
         inplace: bool = True,  # inplace modification of models
         nms: bool = False,
-        conf_thr = 0.05
-        nms_thr = 0.45
+        conf_thr: float = 0.05,
+        iou_thr: float = 0.45,
     ):
         super().__init__()
         self.obj_det = ObjectsModel(obj_det_weigths, device=device, fp16=fp16, fuse=fuse)
@@ -280,7 +280,7 @@ class AHOY(nn.Module):
         self.names = self.obj_det.names
         self.nms = nms
         self.conf_thr = conf_thr
-        self.nms_thr = nms_thr
+        self.iou_thr = iou_thr
 
         # keep track of hooks
         self.hooks = {}
@@ -340,7 +340,7 @@ class AHOY(nn.Module):
 
         #do nms in graph
         if module.nms:
-            new_first_tuple = nms(first_tuple[0], module.conf_thr, module.nms_thr)
+            new_first_tuple = graph_nms(first_tuple[0], module.conf_thr, module.iou_thr)
         
         else:
             # Convert the first item of the first tuple to float
@@ -358,7 +358,7 @@ class AHOY(nn.Module):
             # Reconstruct the overall output
         return (new_first_tuple, second_item.float(), third_item.float())
 
-def nms(x, score_thres=0.05, iou_thres=0.45):
+def graph_nms(x, score_thres=0.05, iou_thres=0.45):
     
     #get batch size
     batch_size = x.shape[0]
@@ -378,7 +378,7 @@ def nms(x, score_thres=0.05, iou_thres=0.45):
         batch_classes = batch_classes[idx]
 
         #do nms
-        keep_indices = nms(batch_boxes, batch_scores, 0.1)  # Perform NMS
+        keep_indices = nms(batch_boxes, batch_scores, iou_thres)  # Perform NMS
 
         #filter nms results and reconcatenate
         batch_keep_boxes = batch_boxes[keep_indices]

@@ -38,6 +38,9 @@ def init_model(
     hor_weights: List[str],
     half: bool,
     fuse: bool,
+    nms: bool = False,
+    conf_thr: float = 0.05,
+    iou_thr: float = 0.45
 ) -> Union[AHOY, DAN]:
     """Load the AHOY or DAN model based on the number of weights provided."""
     if len(det_weights) == len(hor_weights) == 1:
@@ -46,6 +49,9 @@ def init_model(
             hor_det_weights=hor_weights[0],
             fp16=half,
             fuse=fuse,
+            nms=nms,
+            conf_thr=conf_thr,
+            iou_thr=iou_thr
         )
     if len(det_weights) == len(hor_weights) == 2:
         return DAN(
@@ -54,12 +60,18 @@ def init_model(
                 hor_det_weights=hor_weights[0],
                 fp16=half,
                 fuse=fuse,
+                nms=nms,
+                conf_thr=conf_thr,
+                iou_thr=iou_thr
             ),
             model_b=AHOY(
                 obj_det_weigths=det_weights[1],
                 hor_det_weights=hor_weights[1],
                 fp16=half,
                 fuse=fuse,
+                nms=nms,
+                conf_thr=conf_thr,
+                iou_thr=iou_thr
             ),
         )
     raise ValueError("Invalid number of weights.")
@@ -93,10 +105,13 @@ def main(
     fuse: bool,
     input_as_fp32: bool = False,
     fname: str = "",
+    nms: bool = False,
+    conf_thr: float = 0.05,
+    iou_thr: float = 0.45
 ):
     """Export the model to TensorRT engine."""
 
-    model = init_model(det_weights, hor_weights, half, fuse)
+    model = init_model(det_weights, hor_weights, half, fuse, nms, conf_thr, iou_thr)
     if not fname:
         fname = get_engine_fname(model, batch_size, imgsz)
     print(f"🚀 Exporting model {type(model).__name__} to {fname}...")
@@ -194,6 +209,23 @@ def _parse_args():
         type=str,
         default="",
         help="Filename for the exported model (engine or onnx).",
+    )
+    parser.add_argument(
+        "--nms",
+        action="store_true",
+        help="Use NMS for postprocessing.",
+    )
+    parser.add_argument(
+        "--iou-thr",
+        type=float,
+        default=0.45,
+        help="NMS IoU threshold. Default: 0.45",
+    )
+    parser.add_argument(
+        "--conf-thr",
+        type=float,
+        default=0.05,
+        help="NMS confidence threshold. Default: 0.05",
     )
     return parser.parse_args()
 
