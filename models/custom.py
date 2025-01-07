@@ -26,6 +26,7 @@ class HorizonModel(BaseModel):
         cutoff: int = None,
         fp16: bool = False,
         fuse: bool = False,  # false for training, true for inference
+        max_dets: int = 100,
     ):
         """
         Horizon detection model.
@@ -340,7 +341,7 @@ class AHOY(nn.Module):
 
         #do nms in graph
         if module.nms:
-            new_first_tuple = graph_nms(first_tuple[0], module.conf_thr, module.iou_thr)
+            new_first_tuple = graph_nms(first_tuple[0], module.conf_thr, module.iou_thr, max_dets=100)
         
         else:
             # Convert the first item of the first tuple to float
@@ -358,13 +359,13 @@ class AHOY(nn.Module):
             # Reconstruct the overall output
         return (new_first_tuple, second_item.float(), third_item.float())
 
-def graph_nms(x, score_thres=0.05, iou_thres=0.45):
+def graph_nms(x, score_thres=0.05, iou_thres=0.45, max_dets=100):
     """
     Do nms in graph, with one hot output vector for valid boxes.
-    Output shape is (b,1000,1+4+1+NC)
+    Output shape is (b,max_dets,1+4+1+NC)
     Where:
         b = batch size
-        1000 = max number of boxes to keep
+        max_dets = max number of boxes to keep
         1+4+1+NC = 1 for valid box + 4 for box coords + 1 for objectness + NC for number of classes
     """
     
@@ -372,7 +373,7 @@ def graph_nms(x, score_thres=0.05, iou_thres=0.45):
     batch_size = x.shape[0]
 
     # Process each batch element
-    nms_results = torch.zeros((batch_size, 1000, x.shape[2]+1), dtype=x.dtype)
+    nms_results = torch.zeros((batch_size, max_dets, x.shape[2]+1), dtype=x.dtype)
 
     for b in range(batch_size):
         batch_tensor = x[b]
@@ -391,10 +392,10 @@ def graph_nms(x, score_thres=0.05, iou_thres=0.45):
         batch_keep_boxes = batch_boxes[keep_indices]
         batch_keep_scores = batch_scores[keep_indices]
         batch_keep_classes = batch_classes[keep_indices]
-        batch_keep = torch.cat((batch_keep_boxes, batch_keep_scores.unsqueeze(1), batch_keep_classes), 1)[:1000]
+        batch_keep = torch.cat((batch_keep_boxes, batch_keep_scores.unsqueeze(1), batch_keep_classes), 1)
 
         #fill nms results with one hot for valid boxes
-        nms_results[b,:batch_keep.shape[0],1:] = batch_keep
+        nms_results[b,:batch_keep.shape[0],1:] = batch_keep[:max_dets]
         nms_results[b,:batch_keep.shape[0],0] = torch.ones(batch_keep.shape[0], dtype=x.dtype)
 
     return nms_results
