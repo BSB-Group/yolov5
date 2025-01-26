@@ -617,8 +617,31 @@ def export_coreml(model, im, file, int8, half, nms, mlmodel, prefix=colorstr("Co
     return f, ct_model
 
 
+def export_trt_7_compatible_onnx(model, im, file, dynamic, simplify, prefix=colorstr("TensorRT7:")):
+    LOGGER.info(f"\n{prefix} exporting TensorRT 7 compatible ONNX...")
+    from models.custom import AHOY, DAN
+    if isinstance(model, AHOY):
+        grid = model.obj_det.model[-1].anchor_grid
+        model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
+        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        model.obj_det.model[-1].anchor_grid = grid
+    elif isinstance(model, DAN):
+        grid_a = model.model_a.obj_det.model[-1].anchor_grid
+        model.model_a.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_a]
+        grid_b = model.model_b.obj_det.model[-1].anchor_grid
+        model.model_b.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_b]
+        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        model.model_a.obj_det.model[-1].anchor_grid = grid_a
+        model.model_b.obj_det.model[-1].anchor_grid = grid_b
+    else:
+        grid = model.model[-1].anchor_grid
+        model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
+        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        model.model[-1].anchor_grid = grid
+    return model
+
 @try_export
-def export_engine(model, im, file, half, dynamic, simplify, workspace=4, onnx_only=False, verbose=False, prefix=colorstr("TensorRT:")):
+def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr("TensorRT:"), onnx_only=False, trt_7_compatible=False):
     """
     Export a YOLOv5 model to TensorRT engine format, requiring GPU and TensorRT>=7.0.0.
 
@@ -630,9 +653,10 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, onnx_on
         dynamic (bool): Set to True to enable dynamic input shapes.
         simplify (bool): Set to True to simplify the model during export.
         workspace (int): Workspace size in GB (default is 4).
-        onnx_only (bool): Set to True to only export the ONNX model.
         verbose (bool): Set to True for verbose logging output.
         prefix (str): Log message prefix.
+        onnx_only (bool): Set to True to only export the ONNX model.
+        trt_7_compatible (bool): Set to True to export a TensorRT 7 compatible model.
 
     Returns:
         (pathlib.Path, None): Tuple containing the path to the exported model and None.
@@ -655,7 +679,10 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, onnx_on
         ```
     """
     if onnx_only:
-        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        if trt_7_compatible:
+            export_trt_7_compatible_onnx(model, im, file, dynamic, simplify)
+        else:
+            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
         return file.with_suffix(".onnx"), None
 
     if isinstance(im, (list, tuple)):
@@ -672,25 +699,7 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, onnx_on
         import tensorrt as trt
 
     if trt.__version__[0] == "7":  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
-        from models.custom import AHOY, DAN
-        if isinstance(model, AHOY):
-            grid = model.obj_det.model[-1].anchor_grid
-            model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
-            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
-            model.obj_det.model[-1].anchor_grid = grid
-        elif isinstance(model, DAN):
-            grid_a = model.model_a.obj_det.model[-1].anchor_grid
-            model.model_a.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_a]
-            grid_b = model.model_b.obj_det.model[-1].anchor_grid
-            model.model_b.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_b]
-            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
-            model.model_a.obj_det.model[-1].anchor_grid = grid_a
-            model.model_b.obj_det.model[-1].anchor_grid = grid_b
-        else:
-            grid = model.model[-1].anchor_grid
-            model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
-            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
-            model.model[-1].anchor_grid = grid
+        model = export_trt_7_compatible_onnx(model, im, file, dynamic, simplify)
     else:  # TensorRT >= 8
         check_version(trt.__version__, "8.0.0", hard=True)  # require tensorrt>=8.0.0
         export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12

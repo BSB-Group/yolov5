@@ -91,7 +91,7 @@ def main(
     batch_size: List[int],
     half: bool,
     fuse: bool,
-    input_as_fp32: bool = False,
+    trt7_compatible: bool = False,
     fname: str = "",
 ):
     """Export the model to TensorRT engine."""
@@ -115,7 +115,7 @@ def main(
     model.register_io_hooks()  # inp: uint8 -> fp32/fp16 / 255.0, out: fp16 -> fp32
 
     # Create dummy input
-    image = get_dummy_input(batch_size, imgsz, model.device, input_as_fp32)
+    image = get_dummy_input(batch_size, imgsz, model.device, trt7_compatible)
     # need to run once to get the model to JIT compile
     if isinstance(image, (list, tuple)):
         print(f"🔮 Dummy input...{[(im.shape, im.dtype) for im in image]}")
@@ -132,6 +132,7 @@ def main(
         dynamic=dynamic,
         simplify=False,
         onnx_only=fname.endswith(".onnx"),
+        trt_7_compatible=trt7_compatible,
     )
     print(f"🎉 Model successfully exported to {f}! Ready to deploy! 🚀")
 
@@ -183,10 +184,10 @@ def _parse_args():
         help="Fuse convolution and batchnorm layers.",
     )
     parser.add_argument(
-        "-ifp32",
-        "--input-as-fp32",
+        "-trt7",
+        "--trt7-compatible",
         action="store_true",
-        help="Input image as FP32.",
+        help="Export TensorRT 7 compatible model.",
     )
     parser.add_argument(
         "-f",
