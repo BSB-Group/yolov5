@@ -1,42 +1,46 @@
 """
-Export AHOY or DAN model to TensorRT engine.
-Example usage:
-    python export_hybrid.py \
-        --det-weights /path/to/obj_det_weights.pt \
-        --hor-weights /path/to/hor_det_weights.pt \
+Export AHOY to ONNX format.
+
+ONNX is an open standard for machine learning models that enables interoperability 
+between different frameworks and platforms.
+https://onnx.ai/
+
+The exported ONNX model can be used with various inference engines and accelerators,
+including TensorRT for optimized GPU inference.
+
+Args:
+    det-weights: Path to object detection model weights (.pt)
+    hor-weights: Path to horizon detection model weights (.pt) 
+    imgsz: Input image size (pixels)
+    batch-size: Maximum batch size for inference
+    fuse: Fuse Conv2d + BatchNorm2d layers for optimization
+    half: Export half-precision model (fp16)
+    fname: Output filename for ONNX model
+
+Example:
+    python export_ahoy.py \
+        --det-weights yolov5n.pt \
+        --hor-weights yolov5h.pt \
         --imgsz 640 \
         --batch-size 2 \
-        --half \
         --fuse \
-        --fname ahoy.engine
-
-For ONNX only, simple specify --fname model_name.onnx
+        --half \
+        --fname ahoy.onnx
 """
 
 import argparse
 from pathlib import Path
-from typing import Sequence, Union
-
 import torch
 
-from export import export_engine
+from export import export_onnx, export_onnx_trt7_compatible
 from models.custom import AHOY
 from models.yolo import Detect
 
 
-def get_dummy_input(
-    batch_size: int, imgsz: int, device: str, fp32=False
-) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
+def get_dummy_input(batch_size: int, imgsz: int, device: str, fp32=False) -> torch.Tensor:
     """Create a dummy input image."""
     dummy_input = torch.zeros((batch_size, 3, imgsz, imgsz), device=device).byte()
     return dummy_input.float() if fp32 else dummy_input
-
-
-def get_engine_fname(model, batch_size, imgsz):
-    format_value = lambda x: "-".join(map(str, x)) if isinstance(x, list) else str(x)
-    bs_str = format_value(batch_size)
-    sz_str = format_value(imgsz)
-    return f"{type(model).__name__.lower()}_b{bs_str}_sz{sz_str}.engine"
 
 
 def main(
@@ -59,7 +63,7 @@ def main(
     )
 
     if not fname:
-        fname = get_engine_fname(model, batch_size, imgsz)
+        fname = f"{type(model).__name__.lower()}_b{batch_size}_sz{imgsz}.onnx"
     print(f"🚀 Exporting model {type(model).__name__} to {fname}...")
 
     inplace = False  # default
@@ -76,26 +80,23 @@ def main(
     model.register_io_hooks()  # inp: uint8 -> fp32/fp16 / 255.0, out: fp16 -> fp32
 
     # Create dummy input
-    image = get_dummy_input(batch_size, imgsz, model.device, trt7_compatible)
-    # need to run once to get the model to JIT compile
-    if isinstance(image, (list, tuple)):
-        print(f"🔮 Dummy input...{[(im.shape, im.dtype) for im in image]}")
-        model(*image)
-    else:
-        print(f"🔮 Dummy input...{image.shape}")
-        model(image)
+    image = torch.zeros((batch_size, 3, imgsz, imgsz), device=model.device).byte()
+    # https://github.com/NVIDIA/TensorRT/issues/3026#issuecomment-1570419758
+    image = image.float() if trt7_compatible else image
+    print(f"🔮 Dummy input...{image.shape}, {image.dtype}")
 
-    f, _ = export_engine(
+    model(image)  # need to run once to get the model to JIT compile
+
+    export_func = export_onnx_trt7_compatible if trt7_compatible else export_onnx
+    f, _ = export_func(
         model,
         im=image,
         file=Path(fname),
-        half=half,
         dynamic=dynamic,
         simplify=False,
-        onnx_only=fname.endswith(".onnx"),
-        trt_7_compatible=trt7_compatible,
+        opset=12,
     )
-    print(f"🎉 Model successfully exported to {f}! Ready to deploy! 🚀")
+    print(f"🎉 Model successfully exported to {f}! 🚀")
 
 
 def _parse_args():
@@ -126,19 +127,19 @@ def _parse_args():
         "--batch-size",
         type=int,
         default=1,
-        help="Batch size for processing.",
-    )
-    parser.add_argument(
-        "-hp",
-        "--half",
-        action="store_true",
-        help="Use half precision (FP16) for inference.",
+        help="Input batch size.",
     )
     parser.add_argument(
         "-fu",
         "--fuse",
         action="store_true",
         help="Fuse convolution and batchnorm layers.",
+    )
+    parser.add_argument(
+        "-hf",
+        "--half",
+        action="store_true",
+        help="Export half-precision model.",
     )
     parser.add_argument(
         "-trt7",
@@ -151,7 +152,7 @@ def _parse_args():
         "--fname",
         type=str,
         default="",
-        help="Filename for the exported model (engine or onnx).",
+        help="Filename for the exported model.",
     )
     return parser.parse_args()
 

@@ -617,31 +617,63 @@ def export_coreml(model, im, file, int8, half, nms, mlmodel, prefix=colorstr("Co
     return f, ct_model
 
 
-def export_trt_7_compatible_onnx(model, im, file, dynamic, simplify, prefix=colorstr("TensorRT7:")):
+def export_onnx_trt7_compatible(model, im, file, dynamic, simplify, opset=12, prefix=colorstr("TensorRT7:")):
+    """
+    Export a YOLOv5 model to TensorRT 7 compatible ONNX format.
+
+    Args:
+        model (torch.nn.Module): YOLOv5 model to be exported.
+        im (torch.Tensor): Input tensor of shape (B, C, H, W).
+        file (pathlib.Path): Path to save the exported model.
+        dynamic (bool): Set to True to enable dynamic input shapes.
+        simplify (bool): Set to True to simplify the model during export.
+        opset (int): ONNX opset version, default is 12.
+        prefix (str): Log message prefix.
+
+    Returns:
+        (torch.nn.Module): The model with modified anchor grids.
+
+    Notes:
+        - This function modifies the anchor grids of detection layers to be compatible with TensorRT 7.
+        - Supports AHOY and DAN model types with special handling for their detection layers.
+        - The original anchor grids are restored after export.
+
+    Example:
+        ```python
+        from pathlib import Path
+        import torch
+        from models.yolo import Model
+        
+        model = Model(cfg)  # Create YOLOv5 model
+        im = torch.zeros((1, 3, 640, 640))  # Example input
+        file = Path('model_trt7.onnx')
+        export_trt_7_compatible_onnx(model, im, file, dynamic=True, simplify=True)
+        ```
+    """
     LOGGER.info(f"\n{prefix} exporting TensorRT 7 compatible ONNX...")
     from models.custom import AHOY, DAN
     if isinstance(model, AHOY):
         grid = model.obj_det.model[-1].anchor_grid
         model.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
-        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        export_onnx(model, im, file, opset, dynamic, simplify)  # opset 12
         model.obj_det.model[-1].anchor_grid = grid
     elif isinstance(model, DAN):
         grid_a = model.model_a.obj_det.model[-1].anchor_grid
         model.model_a.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_a]
         grid_b = model.model_b.obj_det.model[-1].anchor_grid
         model.model_b.obj_det.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid_b]
-        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        export_onnx(model, im, file, opset, dynamic, simplify)  # opset 12
         model.model_a.obj_det.model[-1].anchor_grid = grid_a
         model.model_b.obj_det.model[-1].anchor_grid = grid_b
     else:
         grid = model.model[-1].anchor_grid
         model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
-        export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
+        export_onnx(model, im, file, opset, dynamic, simplify)  # opset 12
         model.model[-1].anchor_grid = grid
-    return model
+    return str(file.with_suffix(".onnx")), model
 
 @try_export
-def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr("TensorRT:"), onnx_only=False, trt_7_compatible=False):
+def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr("TensorRT:")):
     """
     Export a YOLOv5 model to TensorRT engine format, requiring GPU and TensorRT>=7.0.0.
 
@@ -678,13 +710,6 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
         export_engine(model.model, input_tensor, export_path, half=True, dynamic=True, simplify=True, workspace=8, verbose=True)
         ```
     """
-    if onnx_only:
-        if trt_7_compatible:
-            export_trt_7_compatible_onnx(model, im, file, dynamic, simplify)
-        else:
-            export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
-        return file.with_suffix(".onnx"), None
-
     if isinstance(im, (list, tuple)):
         assert all(
             i.device.type != "cpu" for i in im
@@ -699,7 +724,7 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
         import tensorrt as trt
 
     if trt.__version__[0] == "7":  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
-        model = export_trt_7_compatible_onnx(model, im, file, dynamic, simplify)
+        model = export_onnx_trt7_compatible(model, im, file, dynamic, simplify)
     else:  # TensorRT >= 8
         check_version(trt.__version__, "8.0.0", hard=True)  # require tensorrt>=8.0.0
         export_onnx(model, im, file, 12, dynamic, simplify)  # opset 12
