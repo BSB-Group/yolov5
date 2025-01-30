@@ -10,71 +10,26 @@ Example usage:
         --fuse \
         --fname ahoy.engine
 
-    python export_hybrid.py \
-        --det-weights /path/to/obj_det_weights.pt /path/to/ir_obj_det_weights.pt \
-        --hor-weights /path/to/hor_det_weights.pt /path/to/ir_hor_det_weights.pt \
-        --imgsz 1280 640 \
-        --batch-size 2 2 \
-        --half \
-        --fuse \
-        --fname dan.engine
-
 For ONNX only, simple specify --fname model_name.onnx
 """
 
 import argparse
 from pathlib import Path
-from typing import List, Sequence, Union
+from typing import Sequence, Union
 
 import torch
 
 from export import export_engine
-from models.custom import AHOY, DAN
+from models.custom import AHOY
 from models.yolo import Detect
-
-
-def init_model(
-    det_weights: List[str],
-    hor_weights: List[str],
-    half: bool,
-    fuse: bool,
-) -> Union[AHOY, DAN]:
-    """Load the AHOY or DAN model based on the number of weights provided."""
-    if len(det_weights) == len(hor_weights) == 1:
-        return AHOY(
-            obj_det_weigths=det_weights[0],
-            hor_det_weights=hor_weights[0],
-            fp16=half,
-            fuse=fuse,
-        )
-    if len(det_weights) == len(hor_weights) == 2:
-        return DAN(
-            model_a=AHOY(
-                obj_det_weigths=det_weights[0],
-                hor_det_weights=hor_weights[0],
-                fp16=half,
-                fuse=fuse,
-            ),
-            model_b=AHOY(
-                obj_det_weigths=det_weights[1],
-                hor_det_weights=hor_weights[1],
-                fp16=half,
-                fuse=fuse,
-            ),
-        )
-    raise ValueError("Invalid number of weights.")
 
 
 def get_dummy_input(
     batch_size: int, imgsz: int, device: str, fp32=False
 ) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     """Create a dummy input image."""
-    dummy_input = [torch.zeros((bs, 3, sz, sz), device=device).byte() for bs, sz in zip(batch_size, imgsz)]
-    if fp32:
-        dummy_input = [inp.float() for inp in dummy_input]
-    if len(dummy_input) == 1:
-        return dummy_input[0]
-    return dummy_input
+    dummy_input = torch.zeros((batch_size, 3, imgsz, imgsz), device=device).byte()
+    return dummy_input.float() if fp32 else dummy_input
 
 
 def get_engine_fname(model, batch_size, imgsz):
@@ -85,10 +40,10 @@ def get_engine_fname(model, batch_size, imgsz):
 
 
 def main(
-    det_weights: List[str],
-    hor_weights: List[str],
-    imgsz: List[int],
-    batch_size: List[int],
+    det_weights: str,
+    hor_weights: str,
+    imgsz: int,
+    batch_size: int,
     half: bool,
     fuse: bool,
     trt7_compatible: bool = False,
@@ -96,7 +51,13 @@ def main(
 ):
     """Export the model to TensorRT engine."""
 
-    model = init_model(det_weights, hor_weights, half, fuse)
+    model = AHOY(
+        obj_det_weigths=det_weights,
+        hor_det_weights=hor_weights,
+        fp16=half,
+        fuse=fuse,
+    )
+
     if not fname:
         fname = get_engine_fname(model, batch_size, imgsz)
     print(f"🚀 Exporting model {type(model).__name__} to {fname}...")
@@ -142,34 +103,30 @@ def _parse_args():
     parser.add_argument(
         "-dw",
         "--det-weights",
-        nargs="+",
         type=str,
         required=True,
-        help="List of paths to the detection model weights.",
+        help="Path to the detection model weights.",
     )
     parser.add_argument(
         "-hw",
         "--hor-weights",
-        nargs="+",
         type=str,
         required=True,
-        help="List of paths to the horizontal model weights.",
+        help="Path to the horizontal model weights.",
     )
     parser.add_argument(
         "-sz",
         "--imgsz",
-        nargs="+",
         type=int,
-        default=[640],
-        help="Image sizes (width and height can be different).",
+        default=640,
+        help="Image size (square).",
     )
     parser.add_argument(
         "-bs",
         "--batch-size",
-        nargs="+",
         type=int,
-        default=[1],
-        help="Batch sizes for processing.",
+        default=1,
+        help="Batch size for processing.",
     )
     parser.add_argument(
         "-hp",
