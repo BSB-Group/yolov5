@@ -38,7 +38,7 @@ def geometric_augment(imgsz: int) -> List[BasicTransform]:
         Ax.ResizeIfNeeded(max_size=imgsz),
         A.HorizontalFlip(p=0.5),
         A.PadIfNeeded(
-            min_height=640, min_width=640, border_mode=cv2.BORDER_CONSTANT, value=0
+            min_height=imgsz, min_width=imgsz, border_mode=cv2.BORDER_CONSTANT, value=0
         ),
         A.Affine(
             p=0.75,
