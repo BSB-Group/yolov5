@@ -647,7 +647,7 @@ def export_onnx_trt7_compatible(model, im, file, dynamic, simplify, opset=12, pr
         model = Model(cfg)  # Create YOLOv5 model
         im = torch.zeros((1, 3, 640, 640))  # Example input
         file = Path('model_trt7.onnx')
-        export_trt_7_compatible_onnx(model, im, file, dynamic=True, simplify=True)
+        export_onnx_trt7_compatible(model, im, file, dynamic=True, simplify=True)
         ```
     """
     LOGGER.info(f"\n{prefix} exporting TensorRT 7 compatible ONNX...")
@@ -690,8 +690,6 @@ def export_engine(
         verbose (bool): Set to True for verbose logging output.
         cache (str): Path to save the TensorRT timing cache.
         prefix (str): Log message prefix.
-        onnx_only (bool): Set to True to only export the ONNX model.
-        trt_7_compatible (bool): Set to True to export a TensorRT 7 compatible model.
 
     Returns:
         (pathlib.Path, None): Tuple containing the path to the exported model and None.
