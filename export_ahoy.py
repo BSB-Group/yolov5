@@ -8,16 +8,8 @@ https://onnx.ai/
 The exported ONNX model can be used with various inference engines and accelerators,
 including TensorRT for optimized GPU inference.
 
-Args:
-    det-weights: Path to object detection model weights (.pt)
-    hor-weights: Path to horizon detection model weights (.pt) 
-    imgsz: Input image size (pixels)
-    batch-size: Maximum batch size for inference
-    fuse: Fuse Conv2d + BatchNorm2d layers for optimization
-    half: Export half-precision model (fp16)
-    fname: Output filename for ONNX model
-
 Example:
+    # Using local weights files:
     python export_ahoy.py \
         --det-weights yolov5n.pt \
         --hor-weights yolov5h.pt \
@@ -26,8 +18,21 @@ Example:
         --fuse \
         --half \
         --fname ahoy.onnx
+
+    # Using W&B artifacts:
+    python export_ahoy.py \
+        --det-weights YOLOv5n-IR:latest \
+        --hor-weights YOLOv5h-IR:latest \
+        --imgsz 640 \
+        --batch-size 2 \
+        --fuse \
+        --half \
+        --fname ahoy.onnx
+
+NOTE: For TensorRT 7 compatible models, use the --trt7-compatible flag.
 """
 
+import logging
 import argparse
 from pathlib import Path
 import torch
@@ -36,11 +41,39 @@ from export import export_onnx, export_onnx_trt7_compatible
 from models.custom import AHOY
 from models.yolo import Detect
 
+logging.basicConfig(level=logging.INFO)
 
-def get_dummy_input(batch_size: int, imgsz: int, device: str, fp32=False) -> torch.Tensor:
-    """Create a dummy input image."""
-    dummy_input = torch.zeros((batch_size, 3, imgsz, imgsz), device=device).byte()
-    return dummy_input.float() if fp32 else dummy_input
+
+def get_weights_path(weights_path: str) -> str:
+    """Get model weights from local path or W&B registry.
+
+    Args:
+        weights_path: Local path or W&B artifact in format <collection_name>:<version>
+
+    Returns:
+        Path to model weights file
+    """
+    if Path(weights_path).exists():
+        return weights_path
+
+    try:
+        import wandb
+    except ImportError:
+        logging.error("Please install wandb to download models from W&B registry")
+        return weights_path
+
+    try:
+        REGISTRY = "model"
+        collection, version = weights_path.split(":")
+
+        api = wandb.Api()
+        artifact_name = f"wandb-registry-{REGISTRY}/{collection}:{version}"
+        artifact_path = api.artifact(name=artifact_name).download()
+        return next(Path(artifact_path).glob("*.pt"))
+
+    except Exception as e:
+        logging.error(f"Failed to download from W&B: {str(e)}")
+        raise e
 
 
 def main(
@@ -54,6 +87,8 @@ def main(
     fname: str = "",
 ):
     """Export the model to TensorRT engine."""
+    det_weights = get_weights_path(det_weights)
+    hor_weights = get_weights_path(hor_weights)
 
     model = AHOY(
         obj_det_weigths=det_weights,
