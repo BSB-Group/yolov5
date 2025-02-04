@@ -318,32 +318,28 @@ class AHOY(nn.Module):
             x = x / 255.0  # 0-255 to 0.0-1.0
             return x
 
-        # if not module.fp16:
-        #     return inputs  # ls
         return tuple(_preprocess(inp) for inp in inputs)
+
 
     @staticmethod
     def _postprocessing_hook(module, inputs, outputs):
-        """Convert outputs to float if model is not in fp16."""
-        if not module.fp16:
-            return outputs
+        """Convert outputs to float (if needed) and apply softmax to logits."""
+
+        def _to_float(x):
+            return x.float() if module.fp16 else x
+
         # ahoy outputs: (tuple(Tensor, ...), Tensor, Tensor)
         first_tuple, second_item, third_item = outputs
 
-        # Convert the first item of the first tuple to float
-        converted_first_item = first_tuple[0].float()
+        # Only convert the first item of the first tuple (the detection outputs)
+        first_tuple = (_to_float(first_tuple[0]),) + first_tuple[1:]
 
-        # Reconstruct the first tuple if there are more items in it
-        if len(first_tuple) > 1:
-            new_first_tuple = (converted_first_item,) + first_tuple[1:]
-        else:
-            new_first_tuple = (converted_first_item,)
-
+        # second and third items are classification logits
         second_item = second_item.softmax(-1)  # batch dim
         third_item = third_item.softmax(-1)  # batch dim
 
         # Reconstruct the overall output
-        return (new_first_tuple, second_item.float(), third_item.float())
+        return (first_tuple, _to_float(second_item), _to_float(third_item))
 
 
 class DAN(nn.Module):
