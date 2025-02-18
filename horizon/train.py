@@ -256,41 +256,56 @@ def evaluate(
     return v_loss, v_ploss, v_tloss, mse_pitch, mse_theta
 
 
-def main(opt):
+def run(    
+    dataset_name: str,  # fiftyone dataset name
+    train_tag: str = "train",  # fiftyone dataset tag
+    val_tag: str = "val",  # fiftyone dataset tag
+    weights: str = "yolov5n.pt",  # initial weights path
+    nc_pitch: int = 500,  # number of pitch classes
+    nc_theta: int = 500,  # number of theta classes
+    pitch_weight: float = 1.0,  # pitch loss weight
+    theta_weight: float = 1.0,  # theta loss weight
+    imgsz: int = 640,  # model input size (assumes squared input)
+    epochs: int = 100,
+    dropout: float = 0.25,  # dropout rate for classification heads
+    im_compression_prob: float = 0.9,
+    batch_size: int = -1,
+    device: str = "cuda" if torch.cuda.is_available() else "cpu",):
+
     # create dir to store checkpoints
-    ckpt_dir = ROOT / "runs" / "horizon" / "train" / opt.dataset_name
+    ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     LOGGER.info(f"{ckpt_dir=}\n")
 
-    if not os.path.exists(opt.weights):
-        opt.weights = attempt_download(opt.weights)  # download if not found locally
+    if not os.path.exists(weights):
+        weights = attempt_download(weights)  # download if not found locally
 
     # load as horizon model
-    model = HorizonModel(opt.weights, opt.nc_pitch, opt.nc_theta, device=opt.device)
+    model = HorizonModel(weights, nc_pitch, nc_theta, device=device)
     for m in model.model:
         print(m.i, m.f, m.type)
     for m in model.modules():
-        if isinstance(m, Dropout) and opt.dropout is not None:
-            m.p = opt.dropout  # set dropout
+        if isinstance(m, Dropout) and dropout is not None:
+            m.p = dropout  # set dropout
     for p in model.parameters():
         p.requires_grad = True  # all params trainable
-    model.imgsz = opt.imgsz
+    model.imgsz = imgsz
     LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
 
     # Batch size
-    if opt.batch_size == -1:  # single-GPU only, estimate best batch size
-        opt.batch_size = check_train_batch_size(model, opt.imgsz)
+    if batch_size == -1:  # single-GPU only, estimate best batch size
+        batch_size = check_train_batch_size(model, imgsz)
     else:        
-        LOGGER.info(f"Batch Size = {opt.batch_size}")
+        LOGGER.info(f"Batch Size = {batch_size}")
 
     # load dataloaders
-    train_dataloader, val_dataloader = get_dataloaders(opt.dataset_name, opt.train_tag, opt.val_tag, opt.imgsz, opt.im_compression_prob, opt.batch_size)
+    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz, im_compression_prob, batch_size)
     LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
 
     optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
 
     lrf = 0.001  # final lr (fraction of lr0)
-    lf = lambda x: (1 - x / opt.epochs) * (1 - lrf) + lrf  # linear
+    lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
     scheduler = LambdaLR(optimizer, lr_lambda=lf)
 
     loss_pitch = CrossEntropyLoss(label_smoothing=0.0)
@@ -309,24 +324,24 @@ def main(opt):
         entity="sea-ai",
         job_type="training",
         config={
-            "dataset_name": opt.dataset_name,
-            "train_tag": opt.train_tag,
-            "val_tag": opt.val_tag,
-            "weights": opt.weights,
-            "nc_pitch": opt.nc_pitch,
-            "nc_theta": opt.nc_theta,
-            "pitch_weight": opt.pitch_weight,
-            "theta_weight": opt.theta_weight,
-            "imgsz": opt.imgsz,
-            "epochs": opt.epochs,
-            "dropout": opt.dropout,
-            "device": opt.device,
-            "batch_size": opt.batch_size,
-            "im_compression_prob": opt.im_compression_prob,
+            "dataset_name": dataset_name,
+            "train_tag": train_tag,
+            "val_tag": val_tag,
+            "weights": weights,
+            "nc_pitch": nc_pitch,
+            "nc_theta": nc_theta,
+            "pitch_weight": pitch_weight,
+            "theta_weight": theta_weight,
+            "imgsz": imgsz,
+            "epochs": epochs,
+            "dropout": dropout,
+            "device": device,
+            "batch_size": batch_size,
+            "im_compression_prob": im_compression_prob,
         },
     )
 
-    for epoch in range(opt.epochs):
+    for epoch in range(epochs):
         t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
         v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
 
@@ -336,20 +351,20 @@ def main(opt):
             train_dataloader,
             loss_pitch,
             loss_theta,
-            opt.pitch_weight,
-            opt.theta_weight,
+            pitch_weight,
+            theta_weight,
             scaler,
             optimizer,
             ema,
             epoch,
-            opt.epochs,
+            epochs,
         )
 
         scheduler.step()
 
         model.eval()
         v_loss, v_ploss, v_tloss, mse_pitch, mse_theta = evaluate(
-            model, val_dataloader, loss_pitch, loss_theta, opt.pitch_weight, opt.theta_weight, ema
+            model, val_dataloader, loss_pitch, loss_theta, pitch_weight, theta_weight, ema
         )
 
         if mse_pitch + mse_theta < best_mse:
@@ -503,8 +518,8 @@ def parse_args():
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
-    parser.add_argument("--batch-size", type=int, default=-1, help="total batch size for the GPU, -1 for autobatch")
     parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument("--batch_size", type=int, default=-1, help="batch size")
     parser.add_argument(
         "--device",
         default="cuda" if torch.cuda.is_available() else "cpu",
@@ -512,12 +527,7 @@ def parse_args():
     )
     return parser.parse_args()
 
-def run(**kwargs):
-    opt = argparse.Namespace(**kwargs)
-    main(opt) 
 
 if __name__ == "__main__":
     args = parse_args()
     run(**vars(args))
-
-
