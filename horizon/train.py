@@ -271,7 +271,28 @@ def run(
     im_compression_prob: float = 0.9,
     batch_size: int = -1,
     device: str = "cuda" if torch.cuda.is_available() else "cpu",):
+    """
+    Train a horizon model.
 
+    Args:
+        dataset_name (str): Fiftyone dataset name.
+        train_tag (str, optional): Fiftyone dataset tag for training data. Defaults to "train".
+        val_tag (str, optional): Fiftyone dataset tag for validation data. Defaults to "val".
+        weights (str, optional): Path to the initial model weights. Defaults to "yolov5n.pt".
+        nc_pitch (int, optional): Number of pitch classes. Defaults to 500.
+        nc_theta (int, optional): Number of theta classes. Defaults to 500.
+        pitch_weight (float, optional): Weight for pitch loss. Defaults to 1.0.
+        theta_weight (float, optional): Weight for theta loss. Defaults to 1.0.
+        imgsz (int, optional): Model input size (assumes squared input). Defaults to 640.
+        epochs (int, optional): Number of training epochs. Defaults to 100.
+        dropout (float, optional): Dropout rate for classification heads. Defaults to 0.25.
+        im_compression_prob (float, optional): Probability of image compression as data augmentation (0 to disable). Defaults to 0.9.
+        batch_size (int, optional): Total batch size for the GPU, -1 for automatic batch size. Defaults to -1.
+        device (str, optional): Computing device, either 'cuda' or 'cpu'. Defaults to "cuda" if available, otherwise "cpu".
+
+    Returns:
+        None
+    """    
     # create dir to store checkpoints
     ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
