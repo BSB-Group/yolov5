@@ -489,8 +489,8 @@ def remove_black_padding(image):
     else:
         return image  # Return original if no contours found
 
-def parse_opt(args=None):
-    """Parse arguments."""
+def parse_args():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, help="dataset name", required=True)
     parser.add_argument("--train_tag", type=str, default="train", help="train tag")
@@ -503,51 +503,21 @@ def parse_opt(args=None):
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
-    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
     parser.add_argument("--batch-size", type=int, default=-1, help="total batch size for the GPU, -1 for autobatch")
+    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
     parser.add_argument(
         "--device",
         default="cuda" if torch.cuda.is_available() else "cpu",
         help="cuda device, i.e. 0 or 0,1,2,3 or cpu",
     )
-    return parser.parse_args(args)
+    return parser.parse_args()
 
 def run(**kwargs):
-    """
-    Execute YOLOv5 horizon training.
-
-    Args:
-        dataset_name (str): Name of the dataset (required).
-        train_tag (str, optional): Tag for training data. Defaults to "train".
-        val_tag (str, optional): Tag for validation data. Defaults to "val".
-        weights (str, optional): Path to the initial model weights. Defaults to "yolov5n.pt".
-        nc_pitch (int, optional): Number of pitch classes. Defaults to 500.
-        nc_theta (int, optional): Number of theta classes. Defaults to 500.
-        pitch_weight (float, optional): Weight for pitch loss. Defaults to 1.0.
-        theta_weight (float, optional): Weight for theta loss. Defaults to 1.0.
-        imgsz (int, optional): Image size for training and validation. Defaults to 640.
-        epochs (int, optional): Number of training epochs. Defaults to 100.
-        dropout (float, optional): Dropout rate. Defaults to 0.25.
-        im_compression_prob (float, optional): Probability of image compression as data augmentation (0 to disable). Defaults to 0.9.
-        batch_size (int, optional): Total batch size for the GPU, -1 for automatic batch size. Defaults to -1.
-        device (str, optional): Computing device, either 'cuda' or 'cpu'. Defaults to "cuda" if available, otherwise "cpu".
-
-    Returns:
-        None
-
-
-    """
-    # Get CLI args first
-    opt = parse_opt()
-    
-    # Override with any provided function kwargs
-    for k, v in kwargs.items():
-        if v is not None:  # Only override if value is not None
-            setattr(opt, k, v)
-    
-    main(opt)  # Pass the namespace object to main
+    opt = argparse.Namespace(**kwargs)
+    main(opt) 
 
 if __name__ == "__main__":
-    run()
+    args = parse_args()
+    run(**vars(args))
 
 
