@@ -43,6 +43,7 @@ from horizon.dataloaders import (  # noqa: E402
     get_val_rgb_dataloader,
 )
 from models.custom import HorizonModel  # noqa: E402
+from utils.autobatch import check_train_batch_size  # noqa: E402
 from utils.downloads import attempt_download  # noqa: E402
 from utils.general import LOGGER, TQDM_BAR_FORMAT  # noqa: E402
 from utils.horizon import pitch_theta_to_points  # noqa: E402
@@ -55,6 +56,7 @@ def get_dataloaders(
     val_tag: str,
     imgsz: int,
     im_compression_prob: float,
+    batch_size: int,
     field: str = "ground_truth_pl.polylines.closed",
 ):
     # TODO: add tag check
@@ -65,7 +67,7 @@ def get_dataloaders(
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
-            batch_size=64 if imgsz == 640 else 16,
+            batch_size=batch_size if imgsz == 640 else 16,
             im_compression_prob = im_compression_prob,
         )
 
@@ -75,7 +77,7 @@ def get_dataloaders(
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
-            batch_size=64 if imgsz == 640 else 16,
+            batch_size=batch_size if imgsz == 640 else 16,
         )
     else:
         train_dataloader = get_train_ir16bit_dataloader(
@@ -254,49 +256,41 @@ def evaluate(
     return v_loss, v_ploss, v_tloss, mse_pitch, mse_theta
 
 
-def run(
-    dataset_name: str,  # fiftyone dataset name
-    train_tag: str = "train",  # fiftyone dataset tag
-    val_tag: str = "val",  # fiftyone dataset tag
-    weights: str = "yolov5n.pt",  # initial weights path
-    nc_pitch: int = 500,  # number of pitch classes
-    nc_theta: int = 500,  # number of theta classes
-    pitch_weight: float = 1.0,  # pitch loss weight
-    theta_weight: float = 1.0,  # theta loss weight
-    imgsz: int = 640,  # model input size (assumes squared input)
-    epochs: int = 100,
-    dropout: float = 0.25,  # dropout rate for classification heads
-    im_compression_prob: float = 0.9,
-    device: str = "cuda" if torch.cuda.is_available() else "cpu",
-):
+def main(opt):
     # create dir to store checkpoints
-    ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
+    ckpt_dir = ROOT / "runs" / "horizon" / "train" / opt.dataset_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     LOGGER.info(f"{ckpt_dir=}\n")
 
-    if not os.path.exists(weights):
-        weights = attempt_download(weights)  # download if not found locally
+    if not os.path.exists(opt.weights):
+        opt.weights = attempt_download(opt.weights)  # download if not found locally
 
     # load as horizon model
-    model = HorizonModel(weights, nc_pitch, nc_theta, device=device)
+    model = HorizonModel(opt.weights, opt.nc_pitch, opt.nc_theta, device=opt.device)
     for m in model.model:
         print(m.i, m.f, m.type)
     for m in model.modules():
-        if isinstance(m, Dropout) and dropout is not None:
-            m.p = dropout  # set dropout
+        if isinstance(m, Dropout) and opt.dropout is not None:
+            m.p = opt.dropout  # set dropout
     for p in model.parameters():
         p.requires_grad = True  # all params trainable
-    model.imgsz = imgsz
+    model.imgsz = opt.imgsz
     LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
 
+    # Batch size
+    if opt.batch_size == -1:  # single-GPU only, estimate best batch size
+        opt.batch_size = check_train_batch_size(model, opt.imgsz)
+    else:        
+        LOGGER.info(f"Batch Size = {opt.batch_size}")
+
     # load dataloaders
-    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz, im_compression_prob)
+    train_dataloader, val_dataloader = get_dataloaders(opt.dataset_name, opt.train_tag, opt.val_tag, opt.imgsz, opt.im_compression_prob, opt.batch_size)
     LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
 
     optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
 
     lrf = 0.001  # final lr (fraction of lr0)
-    lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
+    lf = lambda x: (1 - x / opt.epochs) * (1 - lrf) + lrf  # linear
     scheduler = LambdaLR(optimizer, lr_lambda=lf)
 
     loss_pitch = CrossEntropyLoss(label_smoothing=0.0)
@@ -315,23 +309,24 @@ def run(
         entity="sea-ai",
         job_type="training",
         config={
-            "dataset_name": dataset_name,
-            "train_tag": train_tag,
-            "val_tag": val_tag,
-            "weights": weights,
-            "nc_pitch": nc_pitch,
-            "nc_theta": nc_theta,
-            "pitch_weight": pitch_weight,
-            "theta_weight": theta_weight,
-            "imgsz": imgsz,
-            "epochs": epochs,
-            "dropout": dropout,
-            "device": device,
-            "im_compression_prob": im_compression_prob,
+            "dataset_name": opt.dataset_name,
+            "train_tag": opt.train_tag,
+            "val_tag": opt.val_tag,
+            "weights": opt.weights,
+            "nc_pitch": opt.nc_pitch,
+            "nc_theta": opt.nc_theta,
+            "pitch_weight": opt.pitch_weight,
+            "theta_weight": opt.theta_weight,
+            "imgsz": opt.imgsz,
+            "epochs": opt.epochs,
+            "dropout": opt.dropout,
+            "device": opt.device,
+            "batch_size": opt.batch_size,
+            "im_compression_prob": opt.im_compression_prob,
         },
     )
 
-    for epoch in range(epochs):
+    for epoch in range(opt.epochs):
         t_loss, t_ploss, t_tloss = 0.0, 0.0, 0.0
         v_loss, v_ploss, v_tloss = 0.0, 0.0, 0.0
 
@@ -341,20 +336,20 @@ def run(
             train_dataloader,
             loss_pitch,
             loss_theta,
-            pitch_weight,
-            theta_weight,
+            opt.pitch_weight,
+            opt.theta_weight,
             scaler,
             optimizer,
             ema,
             epoch,
-            epochs,
+            opt.epochs,
         )
 
         scheduler.step()
 
         model.eval()
         v_loss, v_ploss, v_tloss, mse_pitch, mse_theta = evaluate(
-            model, val_dataloader, loss_pitch, loss_theta, pitch_weight, theta_weight, ema
+            model, val_dataloader, loss_pitch, loss_theta, opt.pitch_weight, opt.theta_weight, ema
         )
 
         if mse_pitch + mse_theta < best_mse:
@@ -495,8 +490,8 @@ def remove_black_padding(image):
         return image  # Return original if no contours found
 
 
-def parse_args():
-    """Parse command line arguments."""
+def parse_opt(known=False):
+    """Parse arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, help="dataset name", required=True)
     parser.add_argument("--train_tag", type=str, default="train", help="train tag")
@@ -510,14 +505,46 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
     parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument("--batch-size", type=int, default=-1, help="total batch size for the GPU, -1 for autobatch")
     parser.add_argument(
         "--device",
         default="cuda" if torch.cuda.is_available() else "cpu",
         help="cuda device, i.e. 0 or 0,1,2,3 or cpu",
     )
-    return parser.parse_args()
+    return parser.parse_known_args()[0] if known else parser.parse_args()
 
+def run(**kwargs):
+    """
+    Execute YOLOv5 horizon training.
+
+    Args:
+        dataset_name (str): Name of the dataset (required).
+        train_tag (str, optional): Tag for training data. Defaults to "train".
+        val_tag (str, optional): Tag for validation data. Defaults to "val".
+        weights (str, optional): Path to the initial model weights. Defaults to "yolov5n.pt".
+        nc_pitch (int, optional): Number of pitch classes. Defaults to 500.
+        nc_theta (int, optional): Number of theta classes. Defaults to 500.
+        pitch_weight (float, optional): Weight for pitch loss. Defaults to 1.0.
+        theta_weight (float, optional): Weight for theta loss. Defaults to 1.0.
+        imgsz (int, optional): Image size for training and validation. Defaults to 640.
+        epochs (int, optional): Number of training epochs. Defaults to 100.
+        dropout (float, optional): Dropout rate. Defaults to 0.25.
+        im_compression_prob (float, optional): Probability of image compression as data augmentation (0 to disable). Defaults to 0.9.
+        batch_size (int, optional): Total batch size for the GPU, -1 for automatic batch size. Defaults to -1.
+        device (str, optional): Computing device, either 'cuda' or 'cpu'. Defaults to "cuda" if available, otherwise "cpu".
+
+    Returns:
+        None
+
+
+    """
+    opt = parse_opt(True)
+    for k, v in kwargs.items():
+        setattr(opt, k, v)
+    main(opt)
+    return opt
 
 if __name__ == "__main__":
-    args = parse_args()
-    run(**vars(args))
+    opt = parse_opt()
+    run(**vars(opt)) 
+
