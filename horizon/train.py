@@ -489,7 +489,7 @@ def remove_black_padding(image):
     else:
         return image  # Return original if no contours found
 
-def parse_opt(known=False, args=None):
+def parse_opt(args=None):
     """Parse arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, help="dataset name", required=True)
@@ -510,10 +510,7 @@ def parse_opt(known=False, args=None):
         default="cuda" if torch.cuda.is_available() else "cpu",
         help="cuda device, i.e. 0 or 0,1,2,3 or cpu",
     )
-
-    if args is not None:
-        return parser.parse_known_args(args)[0] if known else parser.parse_args(args)
-    return parser.parse_known_args()[0] if known else parser.parse_args()
+    return parser.parse_args(args)
 
 def run(**kwargs):
     """
@@ -540,12 +537,17 @@ def run(**kwargs):
 
 
     """
-    opt = parse_opt(True, [])  # Ensure no CLI arguments are used in run()
+    # Get CLI args first
+    opt = parse_opt()
+    
+    # Override with any provided function kwargs
     for k, v in kwargs.items():
-        setattr(opt, k, v)
-    main(opt)
-    return opt
+        if v is not None:  # Only override if value is not None
+            setattr(opt, k, v)
+    
+    main(opt)  # Pass the namespace object to main
 
 if __name__ == "__main__":
-    opt = parse_opt()
-    run(**vars(opt))
+    run()
+
+
