@@ -511,9 +511,10 @@ def parse_opt(known=False):
         default="cuda" if torch.cuda.is_available() else "cpu",
         help="cuda device, i.e. 0 or 0,1,2,3 or cpu",
     )
-    return parser.parse_args()
+    return parser.parse_known_args()[0] if known else parser.parse_args()
 
 def run(**kwargs):
+    print(kwargs)
     """
     Execute YOLOv5 horizon training.
 
