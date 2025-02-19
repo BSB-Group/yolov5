@@ -43,6 +43,7 @@ from horizon.dataloaders import (  # noqa: E402
     get_val_rgb_dataloader,
 )
 from models.custom import HorizonModel  # noqa: E402
+from utils.autobatch import check_train_batch_size  # noqa: E402
 from utils.downloads import attempt_download  # noqa: E402
 from utils.general import LOGGER, TQDM_BAR_FORMAT  # noqa: E402
 from utils.horizon import pitch_theta_to_points  # noqa: E402
@@ -55,6 +56,7 @@ def get_dataloaders(
     val_tag: str,
     imgsz: int,
     im_compression_prob: float,
+    batch_size: int,
     field: str = "ground_truth_pl.polylines.closed",
 ):
     # TODO: add tag check
@@ -65,8 +67,8 @@ def get_dataloaders(
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
-            batch_size=64 if imgsz == 640 else 16,
-            im_compression_prob = im_compression_prob,
+            batch_size=batch_size if imgsz == 640 else 16,
+            im_compression_prob=im_compression_prob,
         )
 
         val_dataloader = get_val_rgb_dataloader(
@@ -75,7 +77,7 @@ def get_dataloaders(
                 # .take(5000, seed=51)
             ),
             imgsz=imgsz,
-            batch_size=64 if imgsz == 640 else 16,
+            batch_size=batch_size if imgsz == 640 else 16,
         )
     else:
         train_dataloader = get_train_ir16bit_dataloader(
@@ -84,7 +86,7 @@ def get_dataloaders(
                 # .take(1000, seed=51)
             ),
             imgsz=imgsz,
-            im_compression_prob = im_compression_prob,
+            im_compression_prob=im_compression_prob,
         )
 
         val_dataloader = get_val_ir16bit_dataloader(
@@ -163,7 +165,7 @@ def update(
         t_ploss = (t_ploss * i + _loss_pitch.item()) / (i + 1)
         t_tloss = (t_tloss * i + _loss_theta.item()) / (i + 1)
 
-        mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
+        mem = f"{torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0:.2f} GB"
         pbar.set_description(
             ("%11s" * 2 + "%11.4g" * 5)
             % (
@@ -267,8 +269,31 @@ def run(
     epochs: int = 100,
     dropout: float = 0.25,  # dropout rate for classification heads
     im_compression_prob: float = 0.9,
+    batch_size: int = -1,
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
 ):
+    """
+    Train a horizon model.
+
+    Args:
+        dataset_name (str): Fiftyone dataset name.
+        train_tag (str): Fiftyone dataset tag for training data.
+        val_tag (str): Fiftyone dataset tag for validation data.
+        weights (str): Path to the initial model weights.
+        nc_pitch (int): Number of pitch classes.
+        nc_theta (int): Number of theta classes.
+        pitch_weight (float): Weight for pitch loss.
+        theta_weight (float): Weight for theta loss.
+        imgsz (int): Model input size (assumes squared input).
+        epochs (int): Number of training epochs.
+        dropout (float): Dropout rate for classification heads.
+        im_compression_prob (float): Probability for image compression augmentation.
+        batch_size (int): Total batch size for the GPU, -1 for automatic batch size.
+        device (str): Computing device, either 'cuda' or 'cpu'.
+
+    Returns:
+        None
+    """
     # create dir to store checkpoints
     ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -289,8 +314,16 @@ def run(
     model.imgsz = imgsz
     LOGGER.info(f"{model.nc_pitch=}, {model.nc_theta=}\n")
 
+    # Batch size
+    if batch_size == -1:  # single-GPU only, estimate best batch size
+        batch_size = check_train_batch_size(model, imgsz)
+    else:
+        LOGGER.info(f"Batch Size = {batch_size}")
+
     # load dataloaders
-    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz, im_compression_prob)
+    train_dataloader, val_dataloader = get_dataloaders(
+        dataset_name, train_tag, val_tag, imgsz, im_compression_prob, batch_size
+    )
     LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
 
     optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
@@ -327,6 +360,7 @@ def run(
             "epochs": epochs,
             "dropout": dropout,
             "device": device,
+            "batch_size": batch_size,
             "im_compression_prob": im_compression_prob,
         },
     )
@@ -509,7 +543,13 @@ def parse_args():
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
-    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument(
+        "--im_compression_prob",
+        type=float,
+        default=0.9,
+        help="Image compression probability (data Augmentation). 0 to disable",
+    )
+    parser.add_argument("--batch_size", type=int, default=-1, help="batch size")
     parser.add_argument(
         "--device",
         default="cuda" if torch.cuda.is_available() else "cpu",
