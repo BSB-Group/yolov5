@@ -68,7 +68,7 @@ def get_dataloaders(
             ),
             imgsz=imgsz,
             batch_size=batch_size if imgsz == 640 else 16,
-            im_compression_prob = im_compression_prob,
+            im_compression_prob=im_compression_prob,
         )
 
         val_dataloader = get_val_rgb_dataloader(
@@ -86,7 +86,7 @@ def get_dataloaders(
                 # .take(1000, seed=51)
             ),
             imgsz=imgsz,
-            im_compression_prob = im_compression_prob,
+            im_compression_prob=im_compression_prob,
         )
 
         val_dataloader = get_val_ir16bit_dataloader(
@@ -165,7 +165,7 @@ def update(
         t_ploss = (t_ploss * i + _loss_pitch.item()) / (i + 1)
         t_tloss = (t_tloss * i + _loss_theta.item()) / (i + 1)
 
-        mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2f} GB"
+        mem = f"{torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0:.2f} GB"
         pbar.set_description(
             ("%11s" * 2 + "%11.4g" * 5)
             % (
@@ -256,7 +256,7 @@ def evaluate(
     return v_loss, v_ploss, v_tloss, mse_pitch, mse_theta
 
 
-def run(    
+def run(
     dataset_name: str,  # fiftyone dataset name
     train_tag: str = "train",  # fiftyone dataset tag
     val_tag: str = "val",  # fiftyone dataset tag
@@ -270,29 +270,30 @@ def run(
     dropout: float = 0.25,  # dropout rate for classification heads
     im_compression_prob: float = 0.9,
     batch_size: int = -1,
-    device: str = "cuda" if torch.cuda.is_available() else "cpu",):
+    device: str = "cuda" if torch.cuda.is_available() else "cpu",
+):
     """
     Train a horizon model.
 
     Args:
         dataset_name (str): Fiftyone dataset name.
-        train_tag (str, optional): Fiftyone dataset tag for training data. Defaults to "train".
-        val_tag (str, optional): Fiftyone dataset tag for validation data. Defaults to "val".
-        weights (str, optional): Path to the initial model weights. Defaults to "yolov5n.pt".
-        nc_pitch (int, optional): Number of pitch classes. Defaults to 500.
-        nc_theta (int, optional): Number of theta classes. Defaults to 500.
-        pitch_weight (float, optional): Weight for pitch loss. Defaults to 1.0.
-        theta_weight (float, optional): Weight for theta loss. Defaults to 1.0.
-        imgsz (int, optional): Model input size (assumes squared input). Defaults to 640.
-        epochs (int, optional): Number of training epochs. Defaults to 100.
-        dropout (float, optional): Dropout rate for classification heads. Defaults to 0.25.
-        im_compression_prob (float, optional): Probability of image compression as data augmentation (0 to disable). Defaults to 0.9.
-        batch_size (int, optional): Total batch size for the GPU, -1 for automatic batch size. Defaults to -1.
-        device (str, optional): Computing device, either 'cuda' or 'cpu'. Defaults to "cuda" if available, otherwise "cpu".
+        train_tag (str): Fiftyone dataset tag for training data.
+        val_tag (str): Fiftyone dataset tag for validation data.
+        weights (str): Path to the initial model weights.
+        nc_pitch (int): Number of pitch classes.
+        nc_theta (int): Number of theta classes.
+        pitch_weight (float): Weight for pitch loss.
+        theta_weight (float): Weight for theta loss.
+        imgsz (int): Model input size (assumes squared input).
+        epochs (int): Number of training epochs.
+        dropout (float): Dropout rate for classification heads.
+        im_compression_prob (float): Probability for image compression augmentation.
+        batch_size (int): Total batch size for the GPU, -1 for automatic batch size.
+        device (str): Computing device, either 'cuda' or 'cpu'.
 
     Returns:
         None
-    """    
+    """
     # create dir to store checkpoints
     ckpt_dir = ROOT / "runs" / "horizon" / "train" / dataset_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -316,11 +317,13 @@ def run(
     # Batch size
     if batch_size == -1:  # single-GPU only, estimate best batch size
         batch_size = check_train_batch_size(model, imgsz)
-    else:        
+    else:
         LOGGER.info(f"Batch Size = {batch_size}")
 
     # load dataloaders
-    train_dataloader, val_dataloader = get_dataloaders(dataset_name, train_tag, val_tag, imgsz, im_compression_prob, batch_size)
+    train_dataloader, val_dataloader = get_dataloaders(
+        dataset_name, train_tag, val_tag, imgsz, im_compression_prob, batch_size
+    )
     LOGGER.info(f"{len(train_dataloader)=}, {len(val_dataloader)=}")
 
     optimizer = smart_optimizer(model, name="Adam", lr=0.001, momentum=0.9, decay=0.0001)
@@ -525,6 +528,7 @@ def remove_black_padding(image):
     else:
         return image  # Return original if no contours found
 
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser()
@@ -539,7 +543,12 @@ def parse_args():
     parser.add_argument("--imgsz", type=int, default=640, help="train, val image size")
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--dropout", type=float, default=0.25, help="dropout rate")
-    parser.add_argument("--im_compression_prob", type=float, default=0.9, help="Image compression probability (data Augmentation). 0 to disable")
+    parser.add_argument(
+        "--im_compression_prob",
+        type=float,
+        default=0.9,
+        help="Image compression probability (data Augmentation). 0 to disable",
+    )
     parser.add_argument("--batch_size", type=int, default=-1, help="batch size")
     parser.add_argument(
         "--device",
